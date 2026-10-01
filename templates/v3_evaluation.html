@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+
+{% block title %}
+V3.5 Testing & Evaluation - FoodGrade AI
+{% endblock %}
+
+{% block content %}
+
+<div class="mb-4">
+
+    <h1 class="h3">
+        V3.5 Testing & Evaluation
+    </h1>
+
+    <p class="text-muted">
+        Evaluation of the complete V3 processing pipeline across
+        products stored in the FoodGrade database.
+    </p>
+
+</div>
+
+
+<!-- SUMMARY -->
+
+<div class="row g-3 mb-4">
+
+    <div class="col-md-4">
+
+        <div class="card shadow-sm">
+
+            <div class="card-body">
+
+                <div class="text-muted small">
+                    Products Tested
+                </div>
+
+                <div class="display-6 fw-bold">
+                    {{ total_products }}
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <div class="col-md-4">
+
+        <div class="card shadow-sm">
+
+            <div class="card-body">
+
+                <div class="text-muted small">
+                    Passed
+                </div>
+
+                <div class="display-6 fw-bold text-success">
+                    {{ passed_products }}
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <div class="col-md-4">
+
+        <div class="card shadow-sm">
+
+            <div class="card-body">
+
+                <div class="text-muted small">
+                    Failed
+                </div>
+
+                <div class="display-6 fw-bold text-danger">
+                    {{ failed_products }}
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- PIPELINE -->
+
+<div class="card shadow-sm mb-4">
+
+    <div class="card-body">
+
+        <h2 class="h5">
+            V3 Pipeline
+        </h2>
+
+        <div class="row text-center g-2 mt-2">
+
+            <div class="col-md">
+                <div class="border rounded p-3">
+                    V3.1<br>
+                    <strong>Extraction</strong>
+                </div>
+            </div>
+
+            <div class="col-md">
+                <div class="border rounded p-3">
+                    V3.2<br>
+                    <strong>NLP</strong>
+                </div>
+            </div>
+
+            <div class="col-md">
+                <div class="border rounded p-3">
+                    V3.3<br>
+                    <strong>Ranking</strong>
+                </div>
+            </div>
+
+            <div class="col-md">
+                <div class="border rounded p-3">
+                    V3.4<br>
+                    <strong>FoodGrade</strong>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- RESULTS -->
+
+<div class="card shadow-sm">
+
+    <div class="card-body">
+
+        <h2 class="h5 mb-3">
+            Product Evaluation Results
+        </h2>
+
+        {% if evaluations %}
+
+        <div class="table-responsive">
+
+            <table class="table table-sm table-hover align-middle">
+
+                <thead>
+
+                    <tr>
+
+                        <th>Product</th>
+
+                        <th>Status</th>
+
+                        <th>Claims</th>
+
+                        <th>Ingredients</th>
+
+                        <th>Normalized Claims</th>
+
+                        <th>Normalized Ingredients</th>
+
+                        <th>Ranked Claims</th>
+
+                        <th>Ranked Ingredients</th>
+
+                        <th>Health</th>
+
+                        <th>Claim</th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                {% for item in evaluations %}
+
+                    <tr>
+
+                        <td>
+                            <strong>
+                                {{ item.product_name }}
+                            </strong>
+                        </td>
+
+                        <td>
+
+                            {% if item.status == "PASS" %}
+
+                                <span class="badge text-bg-success">
+                                    PASS
+                                </span>
+
+                            {% else %}
+
+                                <span class="badge text-bg-danger">
+                                    FAIL
+                                </span>
+
+                            {% endif %}
+
+                        </td>
+
+                        <td>
+                            {{ item.claims }}
+                        </td>
+
+                        <td>
+                            {{ item.ingredients }}
+                        </td>
+
+                        <td>
+                            {{ item.normalized_claims }}
+                        </td>
+
+                        <td>
+                            {{ item.normalized_ingredients }}
+                        </td>
+
+                        <td>
+                            {{ item.ranked_claims }}
+                        </td>
+
+                        <td>
+                            {{ item.ranked_ingredients }}
+                        </td>
+
+                        <td>
+                            <strong>
+                                {{ item.health_grade }}
+                            </strong>
+                        </td>
+
+                        <td>
+                            <strong>
+                                {{ item.claim_grade }}
+                            </strong>
+                        </td>
+
+                    </tr>
+
+                    {% if item.error %}
+
+                    <tr>
+
+                        <td colspan="10">
+
+                            <div class="alert alert-danger mb-0">
+
+                                <strong>Error:</strong>
+                                {{ item.error }}
+
+                            </div>
+
+                        </td>
+
+                    </tr>
+
+                    {% endif %}
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+        {% else %}
+
+        <div class="alert alert-warning">
+
+            No products are currently available for evaluation.
+
+        </div>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+
+<div class="alert alert-info mt-4">
+
+    <strong>V3.5 methodology:</strong>
+
+    This page checks whether the complete V3 processing pipeline
+    executes successfully. PASS indicates successful pipeline
+    execution; it does not mean that the extracted information
+    is scientifically or manually verified as correct.
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,10 @@
+Flask>=3.0,<4.0
+requests>=2.32,<3.0
+pandas>=2.2,<3.0
+beautifulsoup4
+lxml
+Scrapy
+Pillow
+pytesseract
+scikit-learn
+joblib

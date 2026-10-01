@@ -1,0 +1,763 @@
+{% extends "base.html" %}
+
+{% block title %}
+FoodGrade AI — Food Intelligence
+{% endblock %}
+
+
+{% block content %}
+
+<div class="container py-4 py-lg-5">
+
+
+    <!-- =====================================================
+         HERO
+         ===================================================== -->
+
+    <section class="fg-hero fg-animate mb-4">
+
+        <div class="row align-items-center">
+
+
+            <!-- LEFT -->
+
+            <div class="col-lg-7">
+
+                <div class="fg-eyebrow">
+
+                    <i class="bi bi-stars"></i>
+
+                    AI-Powered Food Intelligence
+
+                </div>
+
+
+                <h1 class="fg-hero-title">
+
+                    Know what's
+                    <span>inside your food.</span>
+
+                </h1>
+
+
+                <p class="fg-hero-text mt-3">
+
+                    FoodGrade AI analyzes packaged food products
+                    using ingredients, nutrition information and
+                    product claims to generate intelligent food
+                    quality insights.
+
+                </p>
+
+
+                <div class="d-flex flex-wrap gap-2 mt-4">
+
+                    <a
+                        href="{{ url_for('v5_page') }}"
+                        class="fg-btn-orange"
+                    >
+
+                        <i class="bi bi-camera-fill me-2"></i>
+
+                        Scan Food Label
+
+                    </a>
+
+
+                    <a
+                        href="{{ url_for('products') }}"
+                        class="fg-btn-primary"
+                    >
+
+                        <i class="bi bi-box-seam-fill me-2"></i>
+
+                        Explore Products
+
+                    </a>
+
+                </div>
+
+            </div>
+
+
+            <!-- RIGHT PACKAGE -->
+
+            <div class="col-lg-4 offset-lg-1">
+
+                <div class="fg-package">
+
+
+                    <div class="fg-package-top">
+
+                        <div class="fg-package-brand">
+                            FOOD INTELLIGENCE
+                        </div>
+
+                        <div class="fg-package-title">
+                            FoodGrade
+                        </div>
+
+                        <div class="fg-package-subtitle">
+                            Whole Grain Breakfast Cereal
+                        </div>
+
+                    </div>
+
+
+                    <div class="fg-package-body">
+
+                        <small class="text-muted">
+                            Nutrition Snapshot
+                        </small>
+
+
+                        <div class="fg-package-line"></div>
+
+                        <div
+                            class="fg-package-line"
+                            style="width: 80%;"
+                        ></div>
+
+                        <div
+                            class="fg-package-line"
+                            style="width: 62%;"
+                        ></div>
+
+                        <div
+                            class="fg-package-line"
+                            style="width: 90%;"
+                        ></div>
+
+
+                        <div class="fg-package-grade">
+
+                            <div>
+
+                                <small class="text-muted">
+                                    FoodGrade
+                                </small>
+
+                                <div class="fw-bold">
+                                    Healthy profile
+                                </div>
+
+                            </div>
+
+
+                            <span class="fg-grade fg-grade-a">
+                                A
+                            </span>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- =====================================================
+         STATS
+         ===================================================== -->
+
+    <div class="row g-3 mb-5">
+
+
+        <div class="col-6 col-lg-3">
+
+            <div class="fg-stat">
+
+                <div class="fg-stat-icon">
+
+                    <i class="bi bi-box-seam-fill"></i>
+
+                </div>
+
+                <div class="fg-stat-label">
+                    Products Analyzed
+                </div>
+
+                <div class="fg-stat-value">
+                    {{ products|length }}
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="col-6 col-lg-3">
+
+            <div class="fg-stat">
+
+                <div class="fg-stat-icon">
+
+                    <i class="bi bi-heart-pulse-fill"></i>
+
+                </div>
+
+                <div class="fg-stat-label">
+                    Food Assessment
+                </div>
+
+                <div class="fg-stat-value">
+                    Health + Claims
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="col-6 col-lg-3">
+
+            <div class="fg-stat">
+
+                <div class="fg-stat-icon">
+
+                    <i class="bi bi-cpu-fill"></i>
+
+                </div>
+
+                <div class="fg-stat-label">
+                    AI Components
+                </div>
+
+                <div class="fg-stat-value">
+                    NLP + ML
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="col-6 col-lg-3">
+
+            <div class="fg-stat">
+
+                <div class="fg-stat-icon">
+
+                    <i class="bi bi-shield-check"></i>
+
+                </div>
+
+                <div class="fg-stat-label">
+                    Validation
+                </div>
+
+                <div class="fg-stat-value">
+                    6 / 6 Passed
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =====================================================
+         PIPELINE
+         ===================================================== -->
+
+    <div class="text-center mb-3">
+
+        <div class="fg-section-title">
+            From food package to intelligent insight
+        </div>
+
+        <div class="fg-section-subtitle">
+            FoodGrade AI processing pipeline
+        </div>
+
+    </div>
+
+
+    <div class="fg-pipeline-card mb-5">
+
+        <div class="fg-pipeline">
+
+
+            <div class="fg-pipeline-item">
+
+                <i class="bi bi-box-seam-fill"></i>
+
+                Product
+
+            </div>
+
+
+            <span class="fg-pipeline-arrow">
+                →
+            </span>
+
+
+            <div class="fg-pipeline-item">
+
+                <i class="bi bi-globe2"></i>
+
+                Retrieval
+
+            </div>
+
+
+            <span class="fg-pipeline-arrow">
+                →
+            </span>
+
+
+            <div class="fg-pipeline-item">
+
+                <i class="bi bi-file-text-fill"></i>
+
+                Extraction
+
+            </div>
+
+
+            <span class="fg-pipeline-arrow">
+                →
+            </span>
+
+
+            <div class="fg-pipeline-item">
+
+                <i class="bi bi-chat-square-text-fill"></i>
+
+                NLP
+
+            </div>
+
+
+            <span class="fg-pipeline-arrow">
+                →
+            </span>
+
+
+            <div class="fg-pipeline-item">
+
+                <i class="bi bi-award-fill"></i>
+
+                FoodGrade
+
+            </div>
+
+
+            <span class="fg-pipeline-arrow">
+                →
+            </span>
+
+
+            <div class="fg-pipeline-item">
+
+                <i class="bi bi-cpu-fill"></i>
+
+                AI / ML
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =====================================================
+         FEATURES
+         ===================================================== -->
+
+    <div class="mb-3">
+
+        <div class="fg-section-title">
+            What FoodGrade AI analyzes
+        </div>
+
+        <div class="fg-section-subtitle">
+            Multiple food-product signals are processed together.
+        </div>
+
+    </div>
+
+
+    <div class="row g-3 mb-5">
+
+
+        <div class="col-md-6 col-lg-4">
+
+            <div class="fg-feature">
+
+                <div class="fg-feature-icon">
+
+                    <i class="bi bi-heart-pulse-fill"></i>
+
+                </div>
+
+                <h6>
+                    Health Assessment
+                </h6>
+
+                <p>
+                    Evaluates nutritional characteristics and
+                    produces a Health Grade from A to E.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <div class="col-md-6 col-lg-4">
+
+            <div class="fg-feature">
+
+                <div class="fg-feature-icon">
+
+                    <i class="bi bi-patch-check-fill"></i>
+
+                </div>
+
+                <h6>
+                    Claim Assessment
+                </h6>
+
+                <p>
+                    Analyzes product claims separately from
+                    overall nutritional health.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <div class="col-md-6 col-lg-4">
+
+            <div class="fg-feature">
+
+                <div class="fg-feature-icon">
+
+                    <i class="bi bi-upc-scan"></i>
+
+                </div>
+
+                <h6>
+                    Food Label Scanner
+                </h6>
+
+                <p>
+                    Extracts product information from uploaded
+                    food-package labels using OCR.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <div class="col-md-6 col-lg-4">
+
+            <div class="fg-feature">
+
+                <div class="fg-feature-icon">
+
+                    <i class="bi bi-globe2"></i>
+
+                </div>
+
+                <h6>
+                    Web Retrieval
+                </h6>
+
+                <p>
+                    Retrieves product information through
+                    controlled web retrieval and crawling.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <div class="col-md-6 col-lg-4">
+
+            <div class="fg-feature">
+
+                <div class="fg-feature-icon">
+
+                    <i class="bi bi-diagram-3-fill"></i>
+
+                </div>
+
+                <h6>
+                    Similar Products
+                </h6>
+
+                <p>
+                    Finds similar food products using
+                    content-based recommendation.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <div class="col-md-6 col-lg-4">
+
+            <div class="fg-feature">
+
+                <div class="fg-feature-icon">
+
+                    <i class="bi bi-robot"></i>
+
+                </div>
+
+                <h6>
+                    Machine Learning
+                </h6>
+
+                <p>
+                    Uses a Random Forest prototype for
+                    health-grade classification.
+                </p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =====================================================
+         RECENT PRODUCTS
+         ===================================================== -->
+
+    <div class="d-flex justify-content-between align-items-end mb-3">
+
+        <div>
+
+            <div class="fg-section-title">
+                Recent food products
+            </div>
+
+            <div class="fg-section-subtitle">
+                Products currently available in FoodGrade AI.
+            </div>
+
+        </div>
+
+
+        <a
+            href="{{ url_for('products') }}"
+            class="btn btn-sm btn-outline-success"
+        >
+
+            View All
+
+            <i class="bi bi-arrow-right ms-1"></i>
+
+        </a>
+
+    </div>
+
+
+    <div class="row g-3">
+
+
+        {% if products %}
+
+
+            {% for product in products[:6] %}
+
+            <div class="col-md-6 col-lg-4">
+
+
+                <div class="fg-product">
+
+
+                    <div class="d-flex justify-content-between">
+
+
+                        <div>
+
+                            <div class="fg-product-name">
+
+                                {{
+                                    product.product_name
+                                    or
+                                    "Food Product"
+                                }}
+
+                            </div>
+
+
+                            <div class="fg-product-meta mt-1">
+
+                                {{
+                                    product.brand
+                                    or
+                                    product.category
+                                    or
+                                    "Packaged Food"
+                                }}
+
+                            </div>
+
+                        </div>
+
+
+                        <div>
+
+                            {% if product.health_grade == "A" %}
+
+                                <span class="fg-grade fg-grade-a">
+                                    A
+                                </span>
+
+                            {% elif product.health_grade == "B" %}
+
+                                <span class="fg-grade fg-grade-b">
+                                    B
+                                </span>
+
+                            {% elif product.health_grade == "C" %}
+
+                                <span class="fg-grade fg-grade-c">
+                                    C
+                                </span>
+
+                            {% elif product.health_grade == "D" %}
+
+                                <span class="fg-grade fg-grade-d">
+                                    D
+                                </span>
+
+                            {% elif product.health_grade == "E" %}
+
+                                <span class="fg-grade fg-grade-e">
+                                    E
+                                </span>
+
+                            {% else %}
+
+                                <span class="fg-grade">
+                                    —
+                                </span>
+
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="d-flex gap-2 mt-3">
+
+                        <span class="fg-badge">
+
+                            Health:
+                            {{ product.health_grade or "N/A" }}
+
+                        </span>
+
+
+                        <span class="fg-badge">
+
+                            Claim:
+                            {{ product.claim_grade or "N/A" }}
+
+                        </span>
+
+                    </div>
+
+
+                    <div class="mt-3">
+
+                        <a
+                            href="{{ url_for(
+                                'product_detail',
+                                product_id=product.id
+                            ) }}"
+                            class="btn btn-sm btn-outline-success"
+                        >
+
+                            View Analysis
+
+                            <i class="bi bi-arrow-right ms-1"></i>
+
+                        </a>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            {% endfor %}
+
+
+        {% else %}
+
+
+            <div class="col-12">
+
+                <div class="fg-card text-center p-5">
+
+                    <i
+                        class="bi bi-box-seam"
+                        style="font-size: 2rem;"
+                    ></i>
+
+                    <h6 class="mt-3">
+                        No products yet
+                    </h6>
+
+                    <p class="text-muted small">
+                        Add your first packaged food product
+                        to begin.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+        {% endif %}
+
+    </div>
+
+
+    <!-- =====================================================
+         RESEARCH NOTE
+         ===================================================== -->
+
+    <div class="fg-research-note mt-5">
+
+        <strong>
+
+            <i class="bi bi-info-circle-fill me-1"></i>
+
+            Academic Prototype
+
+        </strong>
+
+        <span class="ms-1">
+
+            FoodGrade AI demonstrates an integrated pipeline
+            combining food data, web retrieval, information
+            extraction, NLP, OCR, recommendation and
+            machine learning.
+
+        </span>
+
+    </div>
+
+
+</div>
+
+{% endblock %}

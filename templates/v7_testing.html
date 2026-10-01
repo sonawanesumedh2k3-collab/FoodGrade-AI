@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container py-4">
+
+    <h2>V7 — Testing & Validation</h2>
+
+    <p class="text-muted">
+        Functional validation of the major FoodGrade AI
+        system components.
+    </p>
+
+
+    <!-- SUMMARY -->
+
+    <div class="row mb-4">
+
+        <div class="col-md-4">
+
+            <div class="card text-center">
+
+                <div class="card-body">
+
+                    <h2>
+                        {{ results.total }}
+                    </h2>
+
+                    <p class="mb-0">
+                        Total Tests
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="col-md-4">
+
+            <div class="card text-center">
+
+                <div class="card-body">
+
+                    <h2 class="text-success">
+                        {{ results.passed }}
+                    </h2>
+
+                    <p class="mb-0">
+                        Passed
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="col-md-4">
+
+            <div class="card text-center">
+
+                <div class="card-body">
+
+                    <h2 class="text-danger">
+                        {{ results.failed }}
+                    </h2>
+
+                    <p class="mb-0">
+                        Failed
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- TEST TABLE -->
+
+    <div class="card">
+
+        <div class="card-header">
+
+            <strong>
+                System Test Results
+            </strong>
+
+        </div>
+
+        <div class="card-body">
+
+            <table class="table table-bordered">
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            #
+                        </th>
+
+                        <th>
+                            Component
+                        </th>
+
+                        <th>
+                            Status
+                        </th>
+
+                        <th>
+                            Details
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    {% for test in results.tests %}
+
+                    <tr>
+
+                        <td>
+                            {{ loop.index }}
+                        </td>
+
+                        <td>
+                            <strong>
+                                {{ test.name }}
+                            </strong>
+                        </td>
+
+                        <td>
+
+                            {% if test.status == "PASS" %}
+
+                            <span class="badge bg-success">
+                                PASS
+                            </span>
+
+                            {% else %}
+
+                            <span class="badge bg-danger">
+                                FAIL
+                            </span>
+
+                            {% endif %}
+
+                        </td>
+
+                        <td>
+                            {{ test.details }}
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <div class="alert alert-info mt-4">
+
+        <strong>Testing Scope:</strong>
+
+        Database connectivity, information extraction,
+        NLP, web retrieval, OCR, recommendation and
+        machine-learning components were checked.
+
+    </div>
+
+</div>
+
+{% endblock %}

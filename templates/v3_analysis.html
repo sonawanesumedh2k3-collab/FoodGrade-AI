@@ -1,0 +1,703 @@
+{% extends "base.html" %}
+
+{% block title %}
+V3.1 Information Extraction - FoodGrade AI
+{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start mb-4">
+
+    <div>
+        <h1 class="h3 mb-1">
+            V3.1 Information Extraction
+        </h1>
+
+        <p class="text-muted mb-0">
+            {{ product['product_name'] }}
+        </p>
+    </div>
+
+    <a class="btn btn-outline-dark"
+       href="{{ url_for('product_detail', product_id=product['id']) }}">
+        Back to Product
+    </a>
+
+</div>
+
+
+<!-- CLAIMS -->
+
+<div class="card shadow-sm mb-4">
+
+    <div class="card-body">
+
+        <h2 class="h5">
+            Extracted Claims
+        </h2>
+
+        {% if result.information_extraction.claims %}
+
+            <div class="row g-3 mt-1">
+
+                {% for claim in result.information_extraction.claims %}
+
+                <div class="col-md-4">
+
+                    <div class="border rounded p-3 h-100">
+
+                        <h6>
+                            {{ claim.text | title }}
+                        </h6>
+
+                        <p class="mb-1">
+                            <strong>Normalized:</strong>
+                            {{ claim.normalized }}
+                        </p>
+
+                        <span class="badge bg-success">
+                            {{ claim.type }}
+                        </span>
+
+                    </div>
+
+                </div>
+
+                {% endfor %}
+
+            </div>
+
+        {% else %}
+
+            <p class="text-muted">
+                No recognizable claims were extracted.
+            </p>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+
+<!-- INGREDIENTS -->
+
+<div class="card shadow-sm mb-4">
+
+    <div class="card-body">
+
+        <h2 class="h5">
+            Extracted Ingredients
+        </h2>
+
+        {% if result.information_extraction.ingredients %}
+
+        <div class="table-responsive">
+
+            <table class="table table-sm align-middle">
+
+                <thead>
+
+                    <tr>
+                        <th>Ingredient</th>
+                        <th>Detected Category</th>
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                {% for item in result.information_extraction.ingredients %}
+
+                    <tr>
+
+                        <td>
+                            {{ item.ingredient }}
+                        </td>
+
+                        <td>
+
+                            {% if item.categories %}
+
+                                {% for category in item.categories %}
+
+                                    <span class="badge text-bg-warning me-1">
+                                        {{ category.replace('_', ' ') }}
+                                    </span>
+
+                                {% endfor %}
+
+                            {% else %}
+
+                                <span class="text-muted">
+                                    General ingredient
+                                </span>
+
+                            {% endif %}
+
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+        {% else %}
+
+        <p class="text-muted">
+            No ingredients available.
+        </p>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+
+<!-- NUTRITION -->
+
+<div class="card shadow-sm mb-4">
+
+    <div class="card-body">
+
+        <h2 class="h5">
+            Extracted Nutrition Entities
+        </h2>
+
+        <div class="row g-3">
+
+        {% for item in result.information_extraction.nutrition %}
+
+            <div class="col-md-3">
+
+                <div class="border rounded p-3 text-center">
+
+                    <div class="text-muted small">
+                        {{ item.name.replace('_', ' ') | title }}
+                    </div>
+
+                    <div class="fs-4 fw-bold">
+                        {{ item.value }}
+                    </div>
+
+                    <div class="small text-muted">
+                        {{ item.unit }}
+                    </div>
+
+                </div>
+
+            </div>
+
+        {% endfor %}
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- NLP / NORMALIZATION -->
+
+<div class="card shadow-sm mb-4">
+
+    <div class="card-body">
+
+        <h2 class="h5">
+            V3.2 NLP Normalization
+        </h2>
+
+        <p class="text-muted">
+            Product claims and ingredients are converted into
+            standardized concepts for downstream ranking and analysis.
+        </p>
+
+        <h6 class="mt-4">
+            Normalized Claims
+        </h6>
+
+        {% if result.nlp.normalized_claims %}
+
+        <div class="table-responsive">
+
+            <table class="table table-sm align-middle">
+
+                <thead>
+                    <tr>
+                        <th>Original</th>
+                        <th>Normalized Concept</th>
+                        <th>Confidence</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                {% for item in result.nlp.normalized_claims %}
+
+                    <tr>
+
+                        <td>
+                            {{ item.original }}
+                        </td>
+
+                        <td>
+                            <span class="badge text-bg-primary">
+                                {{ item.normalized }}
+                            </span>
+                        </td>
+
+                        <td>
+                            {{ (item.confidence * 100) | round(0) }}%
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+        {% else %}
+
+        <p class="text-muted">
+            No claims available for NLP normalization.
+        </p>
+
+        {% endif %}
+
+
+        <h6 class="mt-4">
+            Normalized Ingredients
+        </h6>
+
+        {% if result.nlp.normalized_ingredients %}
+
+        <div class="table-responsive">
+
+            <table class="table table-sm align-middle">
+
+                <thead>
+                    <tr>
+                        <th>Original</th>
+                        <th>Normalized Concept</th>
+                        <th>Confidence</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                {% for item in result.nlp.normalized_ingredients %}
+
+                    <tr>
+
+                        <td>
+                            {{ item.original }}
+                        </td>
+
+                        <td>
+                            <span class="badge text-bg-warning">
+                                {{ item.normalized }}
+                            </span>
+                        </td>
+
+                        <td>
+                            {{ (item.confidence * 100) | round(0) }}%
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+        {% else %}
+
+        <p class="text-muted">
+            No ingredients available for NLP normalization.
+        </p>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+<!-- V3.3 RANKING -->
+
+<div class="card shadow-sm mb-4">
+
+    <div class="card-body">
+
+        <h2 class="h5">
+            V3.3 Claim & Ingredient Ranking
+        </h2>
+
+        <p class="text-muted">
+            Ranking scores indicate downstream relevance for FoodGrade
+            analysis. They are not health scores or claim-verification scores.
+        </p>
+
+
+        <!-- RANKED CLAIMS -->
+
+        <h6 class="mt-4">
+            Ranked Claims
+        </h6>
+
+        {% if result.ranking.ranked_claims %}
+
+        <div class="table-responsive">
+
+            <table class="table table-sm align-middle">
+
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Original</th>
+                        <th>Normalized</th>
+                        <th>Priority</th>
+                        <th>Reason</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                {% for item in result.ranking.ranked_claims %}
+
+                    <tr>
+
+                        <td>
+                            <strong>{{ item.rank }}</strong>
+                        </td>
+
+                        <td>
+                            {{ item.original }}
+                        </td>
+
+                        <td>
+                            <span class="badge text-bg-primary">
+                                {{ item.normalized }}
+                            </span>
+                        </td>
+
+                        <td>
+                            {{ (item.priority_score * 100) | round(0) }}%
+                        </td>
+
+                        <td class="text-muted">
+                            {{ item.reason }}
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+        {% else %}
+
+        <p class="text-muted">
+            No claims available for ranking.
+        </p>
+
+        {% endif %}
+
+
+        <!-- RANKED INGREDIENTS -->
+
+        <h6 class="mt-4">
+            Ranked Ingredients
+        </h6>
+
+        {% if result.ranking.ranked_ingredients %}
+
+        <div class="table-responsive">
+
+            <table class="table table-sm align-middle">
+
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Original</th>
+                        <th>Normalized</th>
+                        <th>Priority</th>
+                        <th>Category</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                {% for item in result.ranking.ranked_ingredients %}
+
+                    <tr>
+
+                        <td>
+                            <strong>{{ item.rank }}</strong>
+                        </td>
+
+                        <td>
+                            {{ item.original }}
+                        </td>
+
+                        <td>
+                            <span class="badge text-bg-warning">
+                                {{ item.normalized }}
+                            </span>
+                        </td>
+
+                        <td>
+                            {{ (item.priority_score * 100) | round(0) }}%
+                        </td>
+
+                        <td>
+
+                            {% if item.categories %}
+
+                                {% for category in item.categories %}
+
+                                    <span class="badge text-bg-light border me-1">
+                                        {{ category.replace('_', ' ') }}
+                                    </span>
+
+                                {% endfor %}
+
+                            {% else %}
+
+                                <span class="text-muted">
+                                    General
+                                </span>
+
+                            {% endif %}
+
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+        {% else %}
+
+        <p class="text-muted">
+            No ingredients available for ranking.
+        </p>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+<!-- V3.4 FOODGRADE INTEGRATION -->
+
+<div class="card shadow-sm mb-4">
+
+    <div class="card-body">
+
+        <h2 class="h5">
+            V3.4 FoodGrade Integration
+        </h2>
+
+        <p class="text-muted">
+            V3 extracted, normalized and ranked information is now
+            connected with the existing FoodGrade assessment engine.
+        </p>
+
+
+        <div class="row g-4 mt-2">
+
+            <!-- HEALTH -->
+
+            <div class="col-md-6">
+
+                <div class="border rounded p-4 h-100">
+
+                    <h5>
+                        Health Grade
+                    </h5>
+
+                    <div class="display-4 fw-bold">
+                        {{ result.foodgrade.health_grade }}
+                    </div>
+
+                    <p class="mb-1">
+                        Score:
+                        <strong>
+                            {{ result.foodgrade.health_score }}
+                        </strong>
+                            / 100
+                    </p>
+
+                    {% if result.foodgrade.health_reasons %}
+
+                    <ul class="small text-muted mt-3">
+
+                        {% for reason in result.foodgrade.health_reasons %}
+
+                        <li>
+                            {{ reason }}
+                        </li>
+
+                        {% endfor %}
+
+                    </ul>
+
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+
+            <!-- CLAIM -->
+
+            <div class="col-md-6">
+
+                <div class="border rounded p-4 h-100">
+
+                    <h5>
+                        Claim Grade
+                    </h5>
+
+                    <div class="display-4 fw-bold">
+                        {{ result.foodgrade.claim_grade }}
+                    </div>
+
+                    <p class="mb-1">
+                        Score:
+                        <strong>
+                            {{ result.foodgrade.claim_score }}
+                        </strong>
+                        / 100
+                    </p>
+
+                    {% if result.foodgrade.claim_reasons %}
+
+                    <ul class="small text-muted mt-3">
+
+                        {% for reason in result.foodgrade.claim_reasons %}
+
+                        <li>
+                            {{ reason }}
+                        </li>
+
+                        {% endfor %}
+
+                    </ul>
+
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- V3 EVIDENCE -->
+
+        <h5 class="mt-4">
+            V3 Evidence Summary
+        </h5>
+
+        <div class="row g-3 mt-1">
+
+            <div class="col-md-4">
+
+                <div class="border rounded p-3">
+
+                    <div class="text-muted small">
+                        Extracted Claims
+                    </div>
+
+                    <div class="fs-4 fw-bold">
+                        {{ result.foodgrade.v3_evidence.extracted_claim_count }}
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="col-md-4">
+
+                <div class="border rounded p-3">
+
+                    <div class="text-muted small">
+                        Extracted Ingredients
+                    </div>
+
+                    <div class="fs-4 fw-bold">
+                        {{ result.foodgrade.v3_evidence.extracted_ingredient_count }}
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="col-md-4">
+
+                <div class="border rounded p-3">
+
+                    <div class="text-muted small">
+                        Ranked Ingredients
+                    </div>
+
+                    <div class="fs-4 fw-bold">
+                        {{ result.foodgrade.v3_evidence.ranked_ingredient_count }}
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="alert alert-warning mt-4 mb-0">
+
+            <strong>Methodology note:</strong>
+
+            The current A–E grades still use the existing prototype
+            FoodGrade methodology. V3 NLP and ranking provide structured
+            evidence but do not replace the grading methodology.
+
+        </div>
+
+    </div>
+
+</div>
+
+<div class="alert alert-info">
+
+    <strong>V3.4 Status:</strong>
+
+    Information extraction, NLP normalization, ranking and
+    FoodGrade integration are implemented.
+
+    The current FoodGrade scoring methodology remains prototype-based.
+</div>
+
+{% endblock %}

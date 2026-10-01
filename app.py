@@ -1,0 +1,2118 @@
+from flask import (
+    Flask,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    flash,
+    session
+)
+
+import sqlite3
+from pathlib import Path
+
+from services.grading_engine import calculate_foodgrade
+from services.openfoodfacts import (
+    fetch_indian_products,
+    save_dataset
+)
+from services.v3_pipeline import run_v3_pipeline
+from services.web_retriever import fetch_product_url
+from services.scrapy_runner import run_crawler
+
+from services.v5_ocr import (
+    perform_ocr,
+    extract_product_from_text
+)
+from services.v6_ml import (
+    train_health_model,
+    predict_health_grade
+)
+from services.v5_recommender import (
+    recommend_similar_products
+)
+
+from services.v7_testing import run_tests
+
+# ============================================================
+# APPLICATION CONFIGURATION
+# ============================================================
+
+BASE_DIR = Path(__file__).resolve().parent
+
+DB_PATH = (
+    BASE_DIR
+    / "database"
+    / "foodgrade.db"
+)
+
+
+app = Flask(__name__)
+
+app.secret_key = (
+    "foodgrade-v4-development-key"
+)
+
+
+# ============================================================
+# DATABASE CONNECTION
+# ============================================================
+
+def get_db():
+
+    DB_PATH.parent.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    conn = sqlite3.connect(
+        DB_PATH
+    )
+
+    conn.row_factory = sqlite3.Row
+
+    return conn
+
+
+# ============================================================
+# DATABASE INITIALIZATION
+# ============================================================
+
+def init_db():
+
+    conn = get_db()
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS products (
+
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            barcode TEXT UNIQUE,
+
+            product_name TEXT NOT NULL,
+
+            brand TEXT,
+
+            category TEXT,
+
+            ingredients TEXT,
+
+            claims TEXT,
+
+            calories REAL DEFAULT 0,
+
+            sugar REAL DEFAULT 0,
+
+            total_fat REAL DEFAULT 0,
+
+            saturated_fat REAL DEFAULT 0,
+
+            protein REAL DEFAULT 0,
+
+            fibre REAL DEFAULT 0,
+
+            salt REAL DEFAULT 0,
+
+            health_score REAL DEFAULT 0,
+
+            health_grade TEXT DEFAULT 'E',
+
+            claim_score REAL DEFAULT 0,
+
+            claim_grade TEXT DEFAULT 'E',
+
+            source TEXT DEFAULT 'Manual',
+
+            source_url TEXT,
+
+            image_url TEXT,
+
+            data_quality_score REAL DEFAULT 0,
+
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+    conn.commit()
+
+    conn.close()
+
+
+# ============================================================
+# SAMPLE PRODUCTS
+# ============================================================
+
+def seed_sample_products():
+
+    conn = get_db()
+
+    count = conn.execute(
+        "SELECT COUNT(*) FROM products"
+    ).fetchone()[0]
+
+    if count == 0:
+
+        samples = [
+
+            {
+                "product_name":
+                    "Oats & Fibre Breakfast Cereal",
+
+                "brand":
+                    "Demo Foods",
+
+                "category":
+                    "Cereal",
+
+                "ingredients":
+                    "Whole grain oats, wheat bran, raisins, almonds, sugar, salt",
+
+                "claims":
+                    "High Fibre",
+
+                "calories":
+                    360,
+
+                "sugar":
+                    8,
+
+                "total_fat":
+                    6,
+
+                "saturated_fat":
+                    1,
+
+                "protein":
+                    11,
+
+                "fibre":
+                    9,
+
+                "salt":
+                    0.5,
+
+                "source":
+                    "Demo"
+            },
+
+
+            {
+                "product_name":
+                    "Chocolate Cream Biscuits",
+
+                "brand":
+                    "Demo Foods",
+
+                "category":
+                    "Biscuits",
+
+                "ingredients":
+                    "Wheat flour, sugar, palm oil, cocoa powder, glucose syrup, salt",
+
+                "claims":
+                    "Tasty, Energy Rich",
+
+                "calories":
+                    500,
+
+                "sugar":
+                    28,
+
+                "total_fat":
+                    23,
+
+                "saturated_fat":
+                    12,
+
+                "protein":
+                    5,
+
+                "fibre":
+                    2,
+
+                "salt":
+                    0.9,
+
+                "source":
+                    "Demo"
+            },
+
+
+            {
+                "product_name":
+                    "Roasted Chickpea Snack",
+
+                "brand":
+                    "Demo Foods",
+
+                "category":
+                    "Snacks",
+
+                "ingredients":
+                    "Roasted chickpeas, spices, salt",
+
+                "claims":
+                    "High Protein, High Fibre",
+
+                "calories":
+                    330,
+
+                "sugar":
+                    3,
+
+                "total_fat":
+                    7,
+
+                "saturated_fat":
+                    1,
+
+                "protein":
+                    18,
+
+                "fibre":
+                    10,
+
+                "salt":
+                    0.7,
+
+                "source":
+                    "Demo"
+            }
+        ]
+
+
+        for product in samples:
+
+            result = calculate_foodgrade(
+                product
+            )
+
+            conn.execute(
+                """
+                INSERT INTO products (
+
+                    product_name,
+                    brand,
+                    category,
+                    ingredients,
+                    claims,
+
+                    calories,
+                    sugar,
+                    total_fat,
+                    saturated_fat,
+                    protein,
+                    fibre,
+                    salt,
+
+                    health_score,
+                    health_grade,
+
+                    claim_score,
+                    claim_grade,
+
+                    source,
+                    data_quality_score
+                )
+
+                VALUES (
+                    ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?,
+                    ?, ?,
+                    ?, ?
+                )
+                """,
+
+                (
+                    product["product_name"],
+                    product["brand"],
+                    product["category"],
+                    product["ingredients"],
+                    product["claims"],
+
+                    product["calories"],
+                    product["sugar"],
+                    product["total_fat"],
+                    product["saturated_fat"],
+                    product["protein"],
+                    product["fibre"],
+                    product["salt"],
+
+                    result["health_score"],
+                    result["health_grade"],
+
+                    result["claim_score"],
+                    result["claim_grade"],
+
+                    product["source"],
+                    100
+                )
+            )
+
+
+        conn.commit()
+
+
+    conn.close()
+
+
+# ============================================================
+# UPDATE / INSERT IMPORTED PRODUCTS
+# ============================================================
+
+def upsert_imported_products(rows):
+
+    conn = get_db()
+
+    inserted = 0
+    updated = 0
+
+
+    for product in rows:
+
+        result = calculate_foodgrade(
+            product
+        )
+
+        barcode = (
+            product.get("barcode")
+            or None
+        )
+
+
+        existing = None
+
+        if barcode:
+
+            existing = conn.execute(
+                """
+                SELECT id
+                FROM products
+                WHERE barcode = ?
+                """,
+                (barcode,)
+            ).fetchone()
+
+
+        values = (
+
+            product.get("product_name", ""),
+
+            product.get("brand", ""),
+
+            product.get("category", ""),
+
+            product.get("ingredients", ""),
+
+            product.get("claims", ""),
+
+            product.get("calories", 0),
+
+            product.get("sugar", 0),
+
+            product.get("total_fat", 0),
+
+            product.get("saturated_fat", 0),
+
+            product.get("protein", 0),
+
+            product.get("fibre", 0),
+
+            product.get("salt", 0),
+
+            result["health_score"],
+
+            result["health_grade"],
+
+            result["claim_score"],
+
+            result["claim_grade"],
+
+            product.get(
+                "source",
+                "Open Food Facts"
+            ),
+
+            product.get(
+                "source_url",
+                ""
+            ),
+
+            product.get(
+                "image_url",
+                ""
+            ),
+
+            product.get(
+                "data_quality_score",
+                0
+            )
+        )
+
+
+        if existing:
+
+            conn.execute(
+                """
+                UPDATE products SET
+
+                    product_name = ?,
+                    brand = ?,
+                    category = ?,
+                    ingredients = ?,
+                    claims = ?,
+
+                    calories = ?,
+                    sugar = ?,
+                    total_fat = ?,
+                    saturated_fat = ?,
+                    protein = ?,
+                    fibre = ?,
+                    salt = ?,
+
+                    health_score = ?,
+                    health_grade = ?,
+
+                    claim_score = ?,
+                    claim_grade = ?,
+
+                    source = ?,
+                    source_url = ?,
+                    image_url = ?,
+                    data_quality_score = ?
+
+                WHERE id = ?
+                """,
+
+                values + (
+                    existing["id"],
+                )
+            )
+
+            updated += 1
+
+
+        else:
+
+            conn.execute(
+                """
+                INSERT INTO products (
+
+                    product_name,
+                    brand,
+                    category,
+                    ingredients,
+                    claims,
+
+                    calories,
+                    sugar,
+                    total_fat,
+                    saturated_fat,
+                    protein,
+                    fibre,
+                    salt,
+
+                    health_score,
+                    health_grade,
+
+                    claim_score,
+                    claim_grade,
+
+                    source,
+                    source_url,
+                    image_url,
+                    data_quality_score,
+
+                    barcode
+                )
+
+                VALUES (
+                    ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?,
+                    ?, ?,
+                    ?, ?, ?, ?,
+                    ?
+                )
+                """,
+
+                values + (
+                    barcode,
+                )
+            )
+
+            inserted += 1
+
+
+    conn.commit()
+
+    conn.close()
+
+    return inserted, updated
+
+
+# ============================================================
+# HOME / DASHBOARD
+# ============================================================
+
+@app.route("/")
+def index():
+
+    conn = get_db()
+
+    products = conn.execute(
+        """
+        SELECT *
+        FROM products
+        ORDER BY id DESC
+        LIMIT 6
+        """
+    ).fetchall()
+
+
+    total = conn.execute(
+        "SELECT COUNT(*) FROM products"
+    ).fetchone()[0]
+
+
+    imported = conn.execute(
+        """
+        SELECT COUNT(*)
+        FROM products
+        WHERE source = 'Open Food Facts'
+        """
+    ).fetchone()[0]
+
+
+    conn.close()
+
+
+    return render_template(
+        "index.html",
+        products=products,
+        total=total,
+        imported=imported
+    )
+
+
+# ============================================================
+# PRODUCTS
+# ============================================================
+
+@app.route("/products")
+def products():
+
+    query = request.args.get(
+        "q",
+        ""
+    ).strip()
+
+
+    conn = get_db()
+
+
+    if query:
+
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM products
+
+            WHERE product_name LIKE ?
+               OR brand LIKE ?
+               OR category LIKE ?
+
+            ORDER BY id DESC
+            """,
+
+            (
+                f"%{query}%",
+                f"%{query}%",
+                f"%{query}%"
+            )
+        ).fetchall()
+
+
+    else:
+
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM products
+            ORDER BY id DESC
+            """
+        ).fetchall()
+
+
+    conn.close()
+
+
+    return render_template(
+        "products.html",
+        products=rows,
+        query=query
+    )
+
+
+# ============================================================
+# ADD PRODUCT
+# ============================================================
+
+@app.route(
+    "/product/new",
+    methods=["GET", "POST"]
+)
+def new_product():
+
+    if request.method == "POST":
+
+        form = request.form
+
+
+        try:
+
+            product = {
+
+                "product_name":
+                    form["product_name"].strip(),
+
+                "brand":
+                    form.get(
+                        "brand",
+                        ""
+                    ).strip(),
+
+                "category":
+                    form.get(
+                        "category",
+                        ""
+                    ).strip(),
+
+                "ingredients":
+                    form.get(
+                        "ingredients",
+                        ""
+                    ).strip(),
+
+                "claims":
+                    form.get(
+                        "claims",
+                        ""
+                    ).strip(),
+
+                "calories":
+                    float(
+                        form.get(
+                            "calories"
+                        ) or 0
+                    ),
+
+                "sugar":
+                    float(
+                        form.get(
+                            "sugar"
+                        ) or 0
+                    ),
+
+                "total_fat":
+                    float(
+                        form.get(
+                            "total_fat"
+                        ) or 0
+                    ),
+
+                "saturated_fat":
+                    float(
+                        form.get(
+                            "saturated_fat"
+                        ) or 0
+                    ),
+
+                "protein":
+                    float(
+                        form.get(
+                            "protein"
+                        ) or 0
+                    ),
+
+                "fibre":
+                    float(
+                        form.get(
+                            "fibre"
+                        ) or 0
+                    ),
+
+                "salt":
+                    float(
+                        form.get(
+                            "salt"
+                        ) or 0
+                    ),
+
+                "source":
+                    "Manual"
+            }
+
+
+            if not product["product_name"]:
+
+                raise ValueError(
+                    "Product name is required."
+                )
+
+
+            result = calculate_foodgrade(
+                product
+            )
+
+
+            conn = get_db()
+
+
+            cursor = conn.execute(
+                """
+                INSERT INTO products (
+
+                    product_name,
+                    brand,
+                    category,
+                    ingredients,
+                    claims,
+
+                    calories,
+                    sugar,
+                    total_fat,
+                    saturated_fat,
+                    protein,
+                    fibre,
+                    salt,
+
+                    health_score,
+                    health_grade,
+
+                    claim_score,
+                    claim_grade,
+
+                    source,
+                    data_quality_score
+                )
+
+                VALUES (
+                    ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?,
+                    ?, ?,
+                    ?, ?
+                )
+                """,
+
+                (
+                    product["product_name"],
+                    product["brand"],
+                    product["category"],
+                    product["ingredients"],
+                    product["claims"],
+
+                    product["calories"],
+                    product["sugar"],
+                    product["total_fat"],
+                    product["saturated_fat"],
+                    product["protein"],
+                    product["fibre"],
+                    product["salt"],
+
+                    result["health_score"],
+                    result["health_grade"],
+
+                    result["claim_score"],
+                    result["claim_grade"],
+
+                    "Manual",
+                    100
+                )
+            )
+
+
+            product_id = cursor.lastrowid
+
+            conn.commit()
+
+            conn.close()
+
+
+            flash(
+                "Product added and analyzed successfully.",
+                "success"
+            )
+
+
+            return redirect(
+                url_for(
+                    "product_detail",
+                    product_id=product_id
+                )
+            )
+
+
+        except ValueError as exc:
+
+            flash(
+                str(exc),
+                "danger"
+            )
+
+
+    return render_template(
+        "new_product.html"
+    )
+
+
+# ============================================================
+# PRODUCT DETAIL
+# ============================================================
+
+@app.route(
+    "/product/<int:product_id>"
+)
+def product_detail(product_id):
+
+    conn = get_db()
+
+    product = conn.execute(
+        """
+        SELECT *
+        FROM products
+        WHERE id = ?
+        """,
+        (product_id,)
+    ).fetchone()
+
+    conn.close()
+
+
+    if product is None:
+
+        flash(
+            "Product not found.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("products")
+        )
+
+
+    return render_template(
+        "product_detail.html",
+        product=product
+    )
+
+
+# ============================================================
+# DELETE PRODUCT
+# ============================================================
+
+@app.route(
+    "/product/<int:product_id>/delete",
+    methods=["POST"]
+)
+def delete_product(product_id):
+
+    conn = get_db()
+
+    conn.execute(
+        """
+        DELETE FROM products
+        WHERE id = ?
+        """,
+        (product_id,)
+    )
+
+    conn.commit()
+
+    conn.close()
+
+
+    flash(
+        "Product deleted.",
+        "success"
+    )
+
+
+    return redirect(
+        url_for("products")
+    )
+
+
+# ============================================================
+# METHODOLOGY
+# ============================================================
+
+@app.route("/methodology")
+def methodology():
+
+    return render_template(
+        "methodology.html"
+    )
+
+
+# ============================================================
+# DATA CENTER
+# ============================================================
+
+@app.route("/data-center")
+def data_center():
+
+    conn = get_db()
+
+
+    total = conn.execute(
+        "SELECT COUNT(*) FROM products"
+    ).fetchone()[0]
+
+
+    off_count = conn.execute(
+        """
+        SELECT COUNT(*)
+        FROM products
+        WHERE source = 'Open Food Facts'
+        """
+    ).fetchone()[0]
+
+
+    manual_count = conn.execute(
+        """
+        SELECT COUNT(*)
+        FROM products
+        WHERE source = 'Manual'
+        """
+    ).fetchone()[0]
+
+
+    conn.close()
+
+
+    latest = (
+        BASE_DIR
+        / "data"
+        / "processed"
+        / "foodgrade_india_latest.csv"
+    )
+
+
+    return render_template(
+        "data_center.html",
+
+        total=total,
+
+        off_count=off_count,
+
+        manual_count=manual_count,
+
+        latest_exists=latest.exists()
+    )
+
+
+# ============================================================
+# IMPORT INDIAN PRODUCTS
+# ============================================================
+
+@app.route(
+    "/data-center/import",
+    methods=["POST"]
+)
+def import_indian_products():
+
+    try:
+
+        limit = int(
+            request.form.get(
+                "limit",
+                "25"
+            )
+        )
+
+
+        rows, payload = (
+            fetch_indian_products(
+                limit=limit
+            )
+        )
+
+
+        if not rows:
+
+            flash(
+                "The source returned no usable Indian products. Try again later.",
+                "warning"
+            )
+
+            return redirect(
+                url_for("data_center")
+            )
+
+
+        save_dataset(
+            rows,
+            payload
+        )
+
+
+        inserted, updated = (
+            upsert_imported_products(
+                rows
+            )
+        )
+
+
+        flash(
+            f"Imported {len(rows)} products: "
+            f"{inserted} new, "
+            f"{updated} updated. "
+            f"Cleaned CSV saved locally.",
+            "success"
+        )
+
+
+    except Exception as exc:
+
+        flash(
+            f"Open Food Facts import failed: {exc}",
+            "danger"
+        )
+
+
+    return redirect(
+        url_for("data_center")
+    )
+
+
+# ============================================================
+# V3 FOUNDATION
+# ============================================================
+
+@app.route("/v3")
+def v3_foundation():
+
+    return render_template(
+        "v3_foundation.html"
+    )
+
+
+# ============================================================
+# V3 PRODUCT ANALYSIS
+# ============================================================
+
+@app.route(
+    "/v3/analyze/<int:product_id>"
+)
+def v3_analyze(product_id):
+
+    conn = get_db()
+
+
+    product = conn.execute(
+        """
+        SELECT *
+        FROM products
+        WHERE id = ?
+        """,
+        (product_id,)
+    ).fetchone()
+
+
+    conn.close()
+
+
+    if product is None:
+
+        flash(
+            "Product not found.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("products")
+        )
+
+
+    result = run_v3_pipeline(
+        product
+    )
+
+
+    return render_template(
+        "v3_analysis.html",
+        product=product,
+        result=result
+    )
+
+
+# ============================================================
+# V3 EVALUATION
+# ============================================================
+
+@app.route("/v3/evaluation")
+def v3_evaluation():
+
+    conn = get_db()
+
+
+    products = conn.execute(
+        """
+        SELECT *
+        FROM products
+        ORDER BY id ASC
+        """
+    ).fetchall()
+
+
+    conn.close()
+
+
+    evaluations = []
+
+    passed = 0
+    failed = 0
+
+
+    for product in products:
+
+        try:
+
+            result = run_v3_pipeline(
+                product
+            )
+
+
+            evaluations.append(
+                {
+                    "product": product,
+                    "result": result,
+                    "status": "PASS"
+                }
+            )
+
+
+            passed += 1
+
+
+        except Exception as exc:
+
+            evaluations.append(
+                {
+                    "product": product,
+                    "result": {
+                        "error": str(exc)
+                    },
+                    "status": "FAIL"
+                }
+            )
+
+
+            failed += 1
+
+
+    return render_template(
+        "v3_evaluation.html",
+
+        evaluations=evaluations,
+
+        products_tested=len(products),
+
+        passed=passed,
+
+        failed=failed
+    )
+
+
+# ============================================================
+# V4 — WEB RETRIEVAL
+# ============================================================
+
+@app.route("/web-retrieval")
+def web_retrieval():
+
+    return render_template(
+        "web_retrieval.html",
+
+        product=session.get(
+            "web_product"
+        ),
+
+        analysis=session.get(
+            "web_analysis"
+        ),
+
+        crawl=session.get(
+            "web_crawl"
+        ),
+
+        crawl_analysis=session.get(
+            "web_crawl_analysis"
+        ),
+
+        crawl_selected=session.get(
+            "web_crawl_selected"
+        )
+    )
+
+
+# ============================================================
+# V4 — SINGLE URL FETCH
+# ============================================================
+
+@app.route(
+    "/web-retrieval/fetch",
+    methods=["POST"]
+)
+def web_fetch():
+
+    url = request.form.get(
+        "url",
+        ""
+    ).strip()
+
+
+    if not url:
+
+        flash(
+            "Please enter a URL.",
+            "warning"
+        )
+
+        return redirect(
+            url_for("web_retrieval")
+        )
+
+
+    try:
+
+        product = fetch_product_url(
+            url
+        )
+
+
+        session["web_product"] = product
+
+
+        session.pop(
+            "web_analysis",
+            None
+        )
+
+
+        flash(
+            "Product page retrieved successfully.",
+            "success"
+        )
+
+
+    except Exception as exc:
+
+        flash(
+            f"Web retrieval failed: {exc}",
+            "danger"
+        )
+
+
+    return redirect(
+        url_for("web_retrieval")
+    )
+
+
+# ============================================================
+# V4 — SINGLE URL → V3
+# ============================================================
+
+@app.route(
+    "/web-retrieval/analyze",
+    methods=["POST"]
+)
+def web_analyze():
+
+    product = session.get(
+        "web_product"
+    )
+
+
+    if not product:
+
+        flash(
+            "Fetch a product page first.",
+            "warning"
+        )
+
+        return redirect(
+            url_for("web_retrieval")
+        )
+
+
+    try:
+
+        analysis = run_v3_pipeline(
+            product
+        )
+
+
+        session["web_analysis"] = (
+            analysis
+        )
+
+
+        flash(
+            "Product successfully analyzed using V3 + FoodGrade.",
+            "success"
+        )
+
+
+    except Exception as exc:
+
+        flash(
+            f"Product analysis failed: {exc}",
+            "danger"
+        )
+
+
+    return redirect(
+        url_for("web_retrieval")
+    )
+
+
+# ============================================================
+# V4 — SCRAPY CRAWLER
+# ============================================================
+
+@app.route(
+    "/web-retrieval/crawl",
+    methods=["POST"]
+)
+def web_crawl():
+
+    start_url = request.form.get(
+        "start_url",
+        ""
+    ).strip()
+
+
+    max_pages = request.form.get(
+        "max_pages",
+        5
+    )
+
+
+    delay = request.form.get(
+        "delay",
+        1
+    )
+
+
+    try:
+
+        result = run_crawler(
+            start_url,
+            max_pages,
+            delay
+        )
+
+
+        session["web_crawl"] = result
+
+
+        session.pop(
+            "web_crawl_analysis",
+            None
+        )
+
+
+        session.pop(
+            "web_crawl_selected",
+            None
+        )
+
+
+        flash(
+            f"Crawler completed: "
+            f"{result['count']} page(s) exported.",
+            "success"
+        )
+
+
+    except Exception as exc:
+
+        flash(
+            f"Crawler failed: {exc}",
+            "danger"
+        )
+
+
+    return redirect(
+        url_for("web_retrieval")
+    )
+
+
+# ============================================================
+# V4 — CRAWLER RESULT → V3 → FOODGRADE
+# ============================================================
+
+@app.route(
+    "/web-retrieval/crawl/analyze/<int:item_index>",
+    methods=["POST"]
+)
+def web_crawl_analyze(item_index):
+
+    crawl = session.get(
+        "web_crawl"
+    )
+
+
+    if not crawl:
+
+        flash(
+            "Run the crawler first.",
+            "warning"
+        )
+
+        return redirect(
+            url_for("web_retrieval")
+        )
+
+
+    items = crawl.get(
+        "items",
+        []
+    )
+
+
+    if (
+        item_index < 0
+        or item_index >= len(items)
+    ):
+
+        flash(
+            "Crawler result not found.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("web_retrieval")
+        )
+
+
+    try:
+
+        # ----------------------------------------------------
+        # COPY CRAWLER ITEM
+        # ----------------------------------------------------
+
+        original = items[
+            item_index
+        ]
+
+
+        product = dict(
+            original
+        )
+
+
+        # ----------------------------------------------------
+        # NORMALIZE TEXT FIELDS
+        # ----------------------------------------------------
+
+        text_fields = [
+
+            "product_name",
+
+            "brand",
+
+            "category",
+
+            "ingredients",
+
+            "claims",
+
+            "source",
+
+            "url"
+        ]
+
+
+        for field in text_fields:
+
+            product[field] = (
+                product.get(field)
+                or ""
+            )
+
+
+        # V3 / FoodGrade expects source_url
+        product["source_url"] = (
+            product.get("url")
+            or ""
+        )
+
+
+        # ----------------------------------------------------
+        # NORMALIZE NUMERIC FIELDS
+        # ----------------------------------------------------
+
+        numeric_fields = [
+
+            "calories",
+
+            "sugar",
+
+            "total_fat",
+
+            "saturated_fat",
+
+            "protein",
+
+            "fibre",
+
+            "salt"
+        ]
+
+
+        for field in numeric_fields:
+
+            try:
+
+                value = product.get(
+                    field
+                )
+
+
+                if (
+                    value is None
+                    or value == ""
+                ):
+
+                    product[field] = 0.0
+
+
+                else:
+
+                    product[field] = float(
+                        value
+                    )
+
+
+            except (
+                TypeError,
+                ValueError
+            ):
+
+                product[field] = 0.0
+
+
+        # ----------------------------------------------------
+        # SEND INTO V3
+        # ----------------------------------------------------
+
+        analysis = run_v3_pipeline(
+            product
+        )
+
+
+        session[
+            "web_crawl_analysis"
+        ] = analysis
+
+
+        session[
+            "web_crawl_selected"
+        ] = item_index
+
+
+        flash(
+            "Crawler product successfully passed to the V3 + FoodGrade pipeline.",
+            "success"
+        )
+
+
+    except Exception as exc:
+
+        flash(
+            f"Crawler product analysis failed: {exc}",
+            "danger"
+        )
+
+
+    return redirect(
+        url_for("web_retrieval")
+    )
+
+# ============================================================
+# V5 — OCR + CONTENT-BASED RECOMMENDATION
+# ============================================================
+
+@app.route("/v5")
+def v5_page():
+
+    return render_template(
+        "v5_ocr.html",
+
+        ocr_text=session.get(
+            "v5_ocr_text"
+        ),
+
+        ocr_product=session.get(
+            "v5_ocr_product"
+        ),
+
+        ocr_analysis=session.get(
+            "v5_ocr_analysis"
+        ),
+
+        recommendations=session.get(
+            "v5_recommendations"
+        )
+    )
+
+
+# ============================================================
+# V5 — OCR
+# ============================================================
+
+@app.route(
+    "/v5/ocr",
+    methods=["POST"]
+)
+def v5_ocr():
+
+    uploaded_file = request.files.get(
+        "image"
+    )
+
+
+    if not uploaded_file:
+
+        flash(
+            "Please select a food product image.",
+            "warning"
+        )
+
+        return redirect(
+            url_for("v5_page")
+        )
+
+
+    filename = secure_filename(
+        uploaded_file.filename
+    )
+
+
+    if not filename:
+
+        flash(
+            "Invalid image filename.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("v5_page")
+        )
+
+
+    allowed_extensions = {
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".webp"
+    }
+
+
+    extension = (
+        Path(filename)
+        .suffix
+        .lower()
+    )
+
+
+    if extension not in allowed_extensions:
+
+        flash(
+            "Please upload PNG, JPG, JPEG or WEBP.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("v5_page")
+        )
+
+
+    try:
+
+        ocr_dir = (
+            BASE_DIR
+            / "data"
+            / "ocr"
+        )
+
+
+        ocr_dir.mkdir(
+            parents=True,
+            exist_ok=True
+        )
+
+
+        image_path = (
+            ocr_dir
+            / filename
+        )
+
+
+        uploaded_file.save(
+            image_path
+        )
+
+
+        # ----------------------------------------------------
+        # OCR
+        # ----------------------------------------------------
+
+        text = perform_ocr(
+            image_path
+        )
+
+
+        if not text:
+
+            flash(
+                "OCR could not detect readable text in the image.",
+                "warning"
+            )
+
+            return redirect(
+                url_for("v5_page")
+            )
+
+
+        # ----------------------------------------------------
+        # EXTRACT PRODUCT DATA
+        # ----------------------------------------------------
+
+        product = (
+            extract_product_from_text(
+                text
+            )
+        )
+
+
+        # ----------------------------------------------------
+        # V3 ANALYSIS
+        # ----------------------------------------------------
+
+        analysis = run_v3_pipeline(
+            product
+        )
+
+
+        # ----------------------------------------------------
+        # SAVE OCR PRODUCT IN DATABASE
+        # ----------------------------------------------------
+
+        result = calculate_foodgrade(
+            product
+        )
+
+
+        conn = get_db()
+
+
+        cursor = conn.execute(
+            """
+            INSERT INTO products (
+
+                product_name,
+                brand,
+                category,
+                ingredients,
+                claims,
+
+                calories,
+                sugar,
+                total_fat,
+                saturated_fat,
+                protein,
+                fibre,
+                salt,
+
+                health_score,
+                health_grade,
+
+                claim_score,
+                claim_grade,
+
+                source,
+                source_url,
+                image_url,
+                data_quality_score
+            )
+
+            VALUES (
+                ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?,
+                ?, ?,
+                ?, ?,
+                ?, ?, ?, ?
+            )
+            """,
+
+            (
+                product.get(
+                    "product_name",
+                    "OCR Product"
+                ),
+
+                product.get(
+                    "brand",
+                    ""
+                ),
+
+                product.get(
+                    "category",
+                    ""
+                ),
+
+                product.get(
+                    "ingredients",
+                    ""
+                ),
+
+                product.get(
+                    "claims",
+                    ""
+                ),
+
+                product.get(
+                    "calories",
+                    0
+                ),
+
+                product.get(
+                    "sugar",
+                    0
+                ),
+
+                product.get(
+                    "total_fat",
+                    0
+                ),
+
+                product.get(
+                    "saturated_fat",
+                    0
+                ),
+
+                product.get(
+                    "protein",
+                    0
+                ),
+
+                product.get(
+                    "fibre",
+                    0
+                ),
+
+                product.get(
+                    "salt",
+                    0
+                ),
+
+                result.get(
+                    "health_score",
+                    0
+                ),
+
+                result.get(
+                    "health_grade",
+                    "E"
+                ),
+
+                result.get(
+                    "claim_score",
+                    0
+                ),
+
+                result.get(
+                    "claim_grade",
+                    "E"
+                ),
+
+                "OCR",
+
+                "",
+
+                "",
+
+                0
+            )
+        )
+
+
+        conn.commit()
+
+
+        # ----------------------------------------------------
+        # RECOMMENDATIONS
+        # ----------------------------------------------------
+
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM products
+            ORDER BY id DESC
+            """
+        ).fetchall()
+
+
+        conn.close()
+
+
+        products = []
+
+        for row in rows:
+
+            products.append(
+                dict(row)
+            )
+
+
+        recommendations = (
+            recommend_similar_products(
+                product,
+                products,
+                top_n=5
+            )
+        )
+
+
+        # ----------------------------------------------------
+        # DISPLAY V5 RESULTS DIRECTLY
+        # ----------------------------------------------------
+        # Do not store large OCR results in Flask's cookie session.
+        # Render the result page directly instead.
+
+        flash(
+            "Food label OCR and product analysis completed.",
+            "success"
+        )
+
+        return render_template(
+            "v5_ocr.html",
+            ocr_text=text,
+            ocr_product=product,
+            ocr_analysis=analysis,
+            recommendations=recommendations
+        )
+
+    except Exception as exc:
+
+        flash(
+            f"V5 OCR failed: {exc}",
+            "danger"
+        )
+
+        return redirect(
+            url_for("v5_page")
+        )
+
+# ============================================================
+# V6 — MACHINE LEARNING
+# ============================================================
+
+@app.route("/v6")
+def v6_page():
+
+    try:
+
+        # Automatically train the model when V6 opens.
+        ml_result = train_health_model()
+
+        return render_template(
+            "v6_ml.html",
+            ml_result=ml_result
+        )
+
+    except Exception as exc:
+
+        return f"""
+        <div style="font-family:Arial;padding:30px;">
+            <h2>V6 Machine Learning Error</h2>
+            <pre>{exc}</pre>
+        </div>
+        """
+
+@app.route(
+    "/v6/train",
+    methods=["POST"]
+)
+def v6_train():
+
+    try:
+
+        result = train_health_model()
+
+        session[
+            "v6_ml_result"
+        ] = result
+
+        flash(
+            "V6 Machine Learning model trained successfully.",
+            "success"
+        )
+
+    except Exception as exc:
+
+        flash(
+            f"V6 ML training failed: {exc}",
+            "danger"
+        )
+
+    return redirect(
+        url_for("v6_page")
+    )
+# ============================================================
+# V7 — TESTING & VALIDATION
+# ============================================================
+
+@app.route("/v7")
+def v7_page():
+
+    results = run_tests()
+
+    return render_template(
+        "v7_testing.html",
+        results=results
+    )
+# ============================================================
+# V8 — PROJECT OVERVIEW
+# ============================================================
+
+@app.route("/v8")
+def v8_page():
+
+    return render_template(
+        "v8_overview.html"
+    )
+# ============================================================
+# APPLICATION START
+# ============================================================
+
+if __name__ == "__main__":
+
+    init_db()
+
+    seed_sample_products()
+
+    app.run(
+        host="127.0.0.1",
+        port=5000,
+        debug=False,
+        use_reloader=False
+    )

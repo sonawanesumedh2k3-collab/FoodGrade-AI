@@ -1,0 +1,10 @@
+BOT_NAME = "foodgrade_ai_crawler"
+SPIDER_MODULES = ["foodgrade_crawler.spiders"]
+ROBOTSTXT_OBEY = True
+CONCURRENT_REQUESTS_PER_DOMAIN = 2
+DOWNLOAD_DELAY = 1.0
+COOKIES_ENABLED = False
+TELNETCONSOLE_ENABLED = False
+LOG_LEVEL = "WARNING"
+FEED_EXPORT_ENCODING = "utf-8"
+USER_AGENT = "FoodGradeAI/4.0 (educational project)"

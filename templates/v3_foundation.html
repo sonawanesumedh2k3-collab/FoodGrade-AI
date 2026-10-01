@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container py-4">
+
+    <div class="mb-4">
+        <h1>FoodGrade AI V3.0</h1>
+        <p class="text-muted">
+            Information Extraction, Language Models and Ranking Foundation
+        </p>
+    </div>
+
+    <div class="row g-4">
+
+        <div class="col-md-3">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5>1. Information Extraction</h5>
+                    <p class="text-muted">
+                        Extract claims, ingredients and nutrition information
+                        from product data.
+                    </p>
+                    <span class="badge bg-secondary">
+                        Foundation
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5>2. Language Models</h5>
+                    <p class="text-muted">
+                        Understand and normalize food-related text and claims.
+                    </p>
+                    <span class="badge bg-secondary">
+                        Foundation
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5>3. Ranking</h5>
+                    <p class="text-muted">
+                        Rank important claims and ingredients according to
+                        their relevance.
+                    </p>
+                    <span class="badge bg-secondary">
+                        Foundation
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5>4. FoodGrade Engine</h5>
+                    <p class="text-muted">
+                        Use the structured information for FoodGrade analysis.
+                    </p>
+                    <span class="badge bg-secondary">
+                        Existing Engine
+                    </span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="card shadow-sm mt-4">
+        <div class="card-body">
+
+            <h4>V3.0 Processing Pipeline</h4>
+
+            <div class="text-center py-4">
+
+                <div class="alert alert-light border">
+                    Product Data
+                </div>
+
+                <div>↓</div>
+
+                <div class="alert alert-light border">
+                    Information Extraction
+                </div>
+
+                <div>↓</div>
+
+                <div class="alert alert-light border">
+                    NLP / Language Models
+                </div>
+
+                <div>↓</div>
+
+                <div class="alert alert-light border">
+                    Claim & Ingredient Ranking
+                </div>
+
+                <div>↓</div>
+
+                <div class="alert alert-light border">
+                    FoodGrade Assessment
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <div class="alert alert-info mt-4">
+        <strong>V3.0 status:</strong>
+        The architecture is established.
+        Actual information extraction, NLP and ranking will be implemented
+        in the upcoming V3 stages.
+    </div>
+
+</div>
+
+{% endblock %}

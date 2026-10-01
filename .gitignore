@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+
+# Python cache/testing
+.pytest_cache/
+.mypy_cache/
+
+# Database runtime files
+*.db-shm
+*.db-wal
+database/*.db
+
+# Temporary files
+*.tmp
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Generated OCR files
+data/ocr/
+
+# Generated ML model files
+data/models/
+
+# Generated web retrieval/crawl files
+data/web/

@@ -1,0 +1,1328 @@
+{% extends "base.html" %}
+
+{% block title %}
+V4 Web Retrieval - FoodGrade AI
+{% endblock %}
+
+{% block content %}
+
+<div class="mb-4">
+
+    <span class="badge text-bg-primary">
+        V4 · Web Retrieval & Web Crawling
+    </span>
+
+    <h1 class="h3 mt-2">
+        Web Product Retrieval
+    </h1>
+
+    <p class="text-muted">
+        Retrieve product information from permitted web pages,
+        extract food-related data, and pass it through the V3
+        Information Extraction, NLP, Ranking and FoodGrade pipeline.
+    </p>
+
+</div>
+
+
+<!-- ========================================================= -->
+<!-- SINGLE URL RETRIEVAL -->
+<!-- ========================================================= -->
+
+<div class="card mb-4">
+
+    <div class="card-body">
+
+        <h2 class="h5">
+            1. Single URL Retrieval
+        </h2>
+
+        <form
+            method="post"
+            action="{{ url_for('web_fetch') }}"
+            class="row g-2"
+        >
+
+            <div class="col-md-10">
+
+                <input
+                    class="form-control"
+                    name="url"
+                    required
+                    placeholder="https://example.com/product-page"
+                >
+
+            </div>
+
+            <div class="col-md-2">
+
+                <button
+                    type="submit"
+                    class="btn btn-primary w-100"
+                >
+                    Fetch Product
+                </button>
+
+            </div>
+
+        </form>
+
+        <small class="text-muted">
+            Use product pages you are allowed to retrieve.
+            Respect site terms, robots.txt and reasonable request rates.
+        </small>
+
+    </div>
+
+</div>
+
+
+<!-- ========================================================= -->
+<!-- SINGLE RETRIEVED PRODUCT -->
+<!-- ========================================================= -->
+
+{% if product %}
+
+<div class="card mb-4">
+
+    <div class="card-header fw-bold">
+        Retrieved Product
+    </div>
+
+    <div class="card-body">
+
+        <div class="row g-3">
+
+            <!-- PRODUCT INFORMATION -->
+
+            <div class="col-md-6">
+
+                <dl class="row">
+
+                    <dt class="col-sm-4">
+                        Name
+                    </dt>
+
+                    <dd class="col-sm-8">
+                        {{ product.get("product_name", "Not detected") }}
+                    </dd>
+
+
+                    <dt class="col-sm-4">
+                        Brand
+                    </dt>
+
+                    <dd class="col-sm-8">
+                        {{ product.get("brand") or "Not detected" }}
+                    </dd>
+
+
+                    <dt class="col-sm-4">
+                        Category
+                    </dt>
+
+                    <dd class="col-sm-8">
+                        {{ product.get("category") or "Not detected" }}
+                    </dd>
+
+
+                    <dt class="col-sm-4">
+                        Method
+                    </dt>
+
+                    <dd class="col-sm-8">
+                        {{ product.get("extraction_method") or "Not detected" }}
+                    </dd>
+
+
+                    <dt class="col-sm-4">
+                        Status
+                    </dt>
+
+                    <dd class="col-sm-8">
+                        HTTP {{ product.get("http_status", "Unknown") }}
+                    </dd>
+
+                </dl>
+
+            </div>
+
+
+            <!-- CLAIMS + INGREDIENTS -->
+
+            <div class="col-md-6">
+
+                <strong>
+                    Claims
+                </strong>
+
+                <p>
+                    {{ product.get("claims") or "No supported claims detected" }}
+                </p>
+
+
+                <strong>
+                    Ingredients
+                </strong>
+
+                <p>
+                    {{ product.get("ingredients") or "Not detected" }}
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <!-- NUTRITION -->
+
+        <h3 class="h6 mt-3">
+            Nutrition detected
+        </h3>
+
+
+        <div class="table-responsive">
+
+            <table class="table table-sm table-bordered">
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            Calories
+                        </th>
+
+                        <th>
+                            Sugar
+                        </th>
+
+                        <th>
+                            Fat
+                        </th>
+
+                        <th>
+                            Sat. Fat
+                        </th>
+
+                        <th>
+                            Protein
+                        </th>
+
+                        <th>
+                            Fibre
+                        </th>
+
+                        <th>
+                            Salt
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody>
+
+                    <tr>
+
+                        <td>
+                            {{ product.get("calories", "—") }}
+                        </td>
+
+                        <td>
+                            {{ product.get("sugar", "—") }} g
+                        </td>
+
+                        <td>
+                            {{ product.get("total_fat", "—") }} g
+                        </td>
+
+                        <td>
+                            {{ product.get("saturated_fat", "—") }} g
+                        </td>
+
+                        <td>
+                            {{ product.get("protein", "—") }} g
+                        </td>
+
+                        <td>
+                            {{ product.get("fibre", "—") }} g
+                        </td>
+
+                        <td>
+                            {{ product.get("salt", "—") }} g
+                        </td>
+
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+
+        <!-- ACTIONS -->
+
+        <div class="d-flex gap-2">
+
+            <form
+                method="post"
+                action="{{ url_for('web_analyze') }}"
+            >
+
+                <button
+                    type="submit"
+                    class="btn btn-success"
+                >
+                    Analyze with FoodGrade
+                </button>
+
+            </form>
+
+
+            {% if product.get("source_url") %}
+
+            <a
+                class="btn btn-outline-dark"
+                href="{{ product.get('source_url') }}"
+                target="_blank"
+                rel="noopener noreferrer"
+            >
+                Open Source Page
+            </a>
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endif %}
+
+
+<!-- ========================================================= -->
+<!-- SINGLE URL V4 → V3 ANALYSIS -->
+<!-- ========================================================= -->
+
+{% if analysis %}
+
+<div class="card mb-4">
+
+    <div class="card-header fw-bold">
+        V4 → V3 FoodGrade Analysis
+    </div>
+
+    <div class="card-body">
+
+        <!-- GRADES -->
+
+        <div class="row g-3">
+
+            <!-- HEALTH GRADE -->
+
+            <div class="col-md-6">
+
+                <div class="alert alert-light border text-center">
+
+                    <div>
+                        Health Grade
+                    </div>
+
+                    <div class="display-4 fw-bold">
+
+                        {{ analysis.get("foodgrade", {}).get("health_grade", "—") }}
+
+                    </div>
+
+                    <strong>
+
+                        {{ analysis.get("foodgrade", {}).get("health_score", "—") }}/100
+
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+            <!-- CLAIM GRADE -->
+
+            <div class="col-md-6">
+
+                <div class="alert alert-light border text-center">
+
+                    <div>
+                        Claim Grade
+                    </div>
+
+                    <div class="display-4 fw-bold">
+
+                        {{ analysis.get("foodgrade", {}).get("claim_grade", "—") }}
+
+                    </div>
+
+                    <strong>
+
+                        {{ analysis.get("foodgrade", {}).get("claim_score", "—") }}/100
+
+                    </strong>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- NORMALIZED CLAIMS + RANKED INGREDIENTS -->
+
+        <div class="row mt-2">
+
+            <!-- NORMALIZED CLAIMS -->
+
+            <div class="col-md-6">
+
+                <h6>
+                    Normalized Claims
+                </h6>
+
+
+                {% set normalized_data = analysis.get("normalized", {}) %}
+
+                {% set normalized_claims = normalized_data.get("normalized_claims", []) %}
+
+
+                {% if normalized_claims %}
+
+                    {% for item in normalized_claims %}
+
+                        <span class="badge text-bg-secondary me-1 mb-1">
+
+                            {{ item.get("normalized", "—") }}
+
+                        </span>
+
+                    {% endfor %}
+
+                {% else %}
+
+                    <span class="text-muted">
+                        None detected
+                    </span>
+
+                {% endif %}
+
+            </div>
+
+
+            <!-- RANKED INGREDIENTS -->
+
+            <div class="col-md-6">
+
+                <h6>
+                    Ranked Ingredients
+                </h6>
+
+
+                {% set ranked_ingredients = analysis.get("ranked_ingredients", []) %}
+
+
+                {% if ranked_ingredients %}
+
+                    {% for item in ranked_ingredients %}
+
+                        <div class="small border-bottom py-1">
+
+                            {{ item.get("normalized", "—") }}
+
+                            —
+
+                            {{ item.get("priority_score", "—") }}
+
+                        </div>
+
+                    {% endfor %}
+
+                {% else %}
+
+                    <span class="text-muted">
+                        None detected
+                    </span>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+
+        <p class="text-muted mt-3 mb-0">
+
+            V4 supplies web-retrieved product data.
+            V3 performs extraction, NLP normalization and ranking.
+            The current A–E grades use the existing prototype
+            FoodGrade methodology.
+
+        </p>
+
+    </div>
+
+</div>
+
+{% endif %}
+
+
+<!-- ========================================================= -->
+<!-- CONTROLLED SCRAPY CRAWLER -->
+<!-- ========================================================= -->
+
+<div class="card">
+
+    <div class="card-body">
+
+        <h2 class="h5">
+            2. Controlled Scrapy Crawler
+        </h2>
+
+        <p class="text-muted">
+
+            Crawling is restricted to the starting domain and
+            a small page limit. robots.txt obedience is enabled.
+
+        </p>
+
+
+        <form
+            method="post"
+            action="{{ url_for('web_crawl') }}"
+            class="row g-2"
+        >
+
+            <!-- START URL -->
+
+            <div class="col-md-7">
+
+                <input
+                    class="form-control"
+                    name="start_url"
+                    required
+                    placeholder="https://example.com/product"
+                >
+
+            </div>
+
+
+            <!-- MAX PAGES -->
+
+            <div class="col-md-2">
+
+                <input
+                    class="form-control"
+                    type="number"
+                    min="1"
+                    max="50"
+                    name="max_pages"
+                    value="5"
+                >
+
+            </div>
+
+
+            <!-- DELAY -->
+
+            <div class="col-md-2">
+
+                <input
+                    class="form-control"
+                    type="number"
+                    min="0"
+                    max="10"
+                    step="0.5"
+                    name="delay"
+                    value="1"
+                >
+
+            </div>
+
+
+            <!-- RUN -->
+
+            <div class="col-md-1">
+
+                <button
+                    type="submit"
+                    class="btn btn-dark w-100"
+                >
+                    Run
+                </button>
+
+            </div>
+
+
+            <div class="col-12">
+
+                <small class="text-muted">
+                    Max pages · Delay (seconds)
+                </small>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+
+<!-- ========================================================= -->
+<!-- CRAWLER RESULTS -->
+<!-- ========================================================= -->
+
+{% if crawl %}
+
+<div class="card mt-4">
+
+    <div class="card-header fw-bold">
+
+        Crawler Results ·
+        {{ crawl.get("count", 0) }} pages
+
+    </div>
+
+
+    <div class="card-body">
+
+        {% set crawl_items = crawl.get("items", []) %}
+
+
+        {% if crawl_items %}
+
+        <div class="table-responsive">
+
+            <table class="table table-sm table-bordered align-middle">
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            #
+                        </th>
+
+                        <th>
+                            Product
+                        </th>
+
+                        <th>
+                            Brand
+                        </th>
+
+                        <th>
+                            Category
+                        </th>
+
+                        <th>
+                            Ingredients
+                        </th>
+
+                        <th>
+                            Claims
+                        </th>
+
+                        <th>
+                            Calories
+                        </th>
+
+                        <th>
+                            Sugar
+                        </th>
+
+                        <th>
+                            Fat
+                        </th>
+
+                        <th>
+                            Sat. Fat
+                        </th>
+
+                        <th>
+                            Protein
+                        </th>
+
+                        <th>
+                            Fibre
+                        </th>
+
+                        <th>
+                            Salt
+                        </th>
+
+                        <th>
+                            Action
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody>
+
+                {% for item in crawl_items %}
+
+                    <tr>
+
+                        <!-- NUMBER -->
+
+                        <td>
+                            {{ loop.index }}
+                        </td>
+
+
+                        <!-- PRODUCT -->
+
+                        <td>
+
+                            <strong>
+
+                                {{ item.get("product_name")
+                                   or item.get("page_title")
+                                   or "Unknown" }}
+
+                            </strong>
+
+                            <br>
+
+                            {% if item.get("url") %}
+
+                            <a
+                                href="{{ item.get('url') }}"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="small"
+                            >
+                                Open Page
+                            </a>
+
+                            {% endif %}
+
+                        </td>
+
+
+                        <!-- BRAND -->
+
+                        <td>
+                            {{ item.get("brand") or "—" }}
+                        </td>
+
+
+                        <!-- CATEGORY -->
+
+                        <td>
+                            {{ item.get("category") or "—" }}
+                        </td>
+
+
+                        <!-- INGREDIENTS -->
+
+                        <td>
+
+                            {{ item.get("ingredients") or "—" }}
+
+                        </td>
+
+
+                        <!-- CLAIMS -->
+
+                        <td>
+
+                            {{ item.get("claims") or "—" }}
+
+                        </td>
+
+
+                        <!-- CALORIES -->
+
+                        <td>
+
+                            {% if item.get("calories") is not none
+                                  and item.get("calories") != "" %}
+
+                                {{ item.get("calories") }}
+
+                            {% else %}
+
+                                —
+
+                            {% endif %}
+
+                        </td>
+
+
+                        <!-- SUGAR -->
+
+                        <td>
+
+                            {% if item.get("sugar") is not none
+                                  and item.get("sugar") != "" %}
+
+                                {{ item.get("sugar") }} g
+
+                            {% else %}
+
+                                —
+
+                            {% endif %}
+
+                        </td>
+
+
+                        <!-- FAT -->
+
+                        <td>
+
+                            {% if item.get("total_fat") is not none
+                                  and item.get("total_fat") != "" %}
+
+                                {{ item.get("total_fat") }} g
+
+                            {% else %}
+
+                                —
+
+                            {% endif %}
+
+                        </td>
+
+
+                        <!-- SATURATED FAT -->
+
+                        <td>
+
+                            {% if item.get("saturated_fat") is not none
+                                  and item.get("saturated_fat") != "" %}
+
+                                {{ item.get("saturated_fat") }} g
+
+                            {% else %}
+
+                                —
+
+                            {% endif %}
+
+                        </td>
+
+
+                        <!-- PROTEIN -->
+
+                        <td>
+
+                            {% if item.get("protein") is not none
+                                  and item.get("protein") != "" %}
+
+                                {{ item.get("protein") }} g
+
+                            {% else %}
+
+                                —
+
+                            {% endif %}
+
+                        </td>
+
+
+                        <!-- FIBRE -->
+
+                        <td>
+
+                            {% if item.get("fibre") is not none
+                                  and item.get("fibre") != "" %}
+
+                                {{ item.get("fibre") }} g
+
+                            {% else %}
+
+                                —
+
+                            {% endif %}
+
+                        </td>
+
+
+                        <!-- SALT -->
+
+                        <td>
+
+                            {% if item.get("salt") is not none
+                                  and item.get("salt") != "" %}
+
+                                {{ item.get("salt") }} g
+
+                            {% else %}
+
+                                —
+
+                            {% endif %}
+
+                        </td>
+
+
+                        <!-- ANALYZE -->
+
+                        <td>
+
+                            <form
+                                method="post"
+                                action="{{ url_for(
+                                    'web_crawl_analyze',
+                                    item_index=loop.index0
+                                ) }}"
+                            >
+
+                                <button
+                                    type="submit"
+                                    class="btn btn-sm btn-success"
+                                >
+                                    Analyze
+                                </button>
+
+                            </form>
+
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+
+        <small class="text-muted">
+
+            Export:
+            {{ crawl.get("output", "Not available") }}
+
+        </small>
+
+
+        {% else %}
+
+        <div class="alert alert-warning mb-0">
+
+            The crawler completed but returned no usable pages.
+
+            This can happen when a website blocks crawling,
+            disallows the request through robots.txt,
+            or does not return an accessible page.
+
+        </div>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+{% endif %}
+
+
+<!-- ========================================================= -->
+<!-- CRAWLER → V3 → FOODGRADE ANALYSIS -->
+<!-- ========================================================= -->
+
+{% if crawl_analysis %}
+
+{% set crawl_foodgrade = crawl_analysis.get("foodgrade", {}) %}
+
+{% set crawl_normalized = crawl_analysis.get("normalized", {}) %}
+
+{% set crawl_ranked_claims = crawl_analysis.get("ranked_claims", []) %}
+
+{% set crawl_ranked_ingredients = crawl_analysis.get("ranked_ingredients", []) %}
+
+{% set crawl_extracted = crawl_analysis.get("extracted", {}) %}
+
+{% set crawl_claims = crawl_extracted.get("claims", []) %}
+
+{% set crawl_normalized_claims = crawl_normalized.get("normalized_claims", []) %}
+
+{% set crawl_normalized_ingredients = crawl_normalized.get("normalized_ingredients", []) %}
+
+
+<div class="card mt-4">
+
+    <div class="card-header fw-bold">
+
+        Crawler → V3 → FoodGrade Analysis
+
+    </div>
+
+
+    <div class="card-body">
+
+
+        <!-- ================================================= -->
+        <!-- GRADES -->
+        <!-- ================================================= -->
+
+        <div class="row g-3">
+
+
+            <!-- HEALTH -->
+
+            <div class="col-md-6">
+
+                <div class="card border">
+
+                    <div class="card-body text-center">
+
+                        <div class="text-muted">
+                            Health Grade
+                        </div>
+
+                        <div class="display-4 fw-bold">
+
+                            {{ crawl_foodgrade.get(
+                                "health_grade",
+                                "—"
+                            ) }}
+
+                        </div>
+
+                        <strong>
+
+                            {{ crawl_foodgrade.get(
+                                "health_score",
+                                "—"
+                            ) }}/100
+
+                        </strong>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- CLAIM -->
+
+            <div class="col-md-6">
+
+                <div class="card border">
+
+                    <div class="card-body text-center">
+
+                        <div class="text-muted">
+                            Claim Grade
+                        </div>
+
+                        <div class="display-4 fw-bold">
+
+                            {{ crawl_foodgrade.get(
+                                "claim_grade",
+                                "—"
+                            ) }}
+
+                        </div>
+
+                        <strong>
+
+                            {{ crawl_foodgrade.get(
+                                "claim_score",
+                                "—"
+                            ) }}/100
+
+                        </strong>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- ================================================= -->
+        <!-- EXTRACTED / NORMALIZED / RANKED CLAIMS -->
+        <!-- ================================================= -->
+
+        <div class="row mt-4">
+
+
+            <!-- EXTRACTED CLAIMS -->
+
+            <div class="col-md-4">
+
+                <h5 class="h6">
+                    Extracted Claims
+                </h5>
+
+
+                {% if crawl_claims %}
+
+                    {% for item in crawl_claims %}
+
+                        <span class="badge text-bg-primary me-1 mb-1">
+
+                            {{ item }}
+
+                        </span>
+
+                    {% endfor %}
+
+                {% else %}
+
+                    <p class="text-muted">
+                        None detected.
+                    </p>
+
+                {% endif %}
+
+            </div>
+
+
+            <!-- NORMALIZED CLAIMS -->
+
+            <div class="col-md-4">
+
+                <h5 class="h6">
+                    Normalized Claims
+                </h5>
+
+
+                {% if crawl_normalized_claims %}
+
+                    {% for item in crawl_normalized_claims %}
+
+                        <div class="border-bottom py-1">
+
+                            {{ item.get(
+                                "normalized",
+                                "—"
+                            ) }}
+
+
+                            <span class="text-muted">
+
+                                {{ item.get(
+                                    "confidence",
+                                    "—"
+                                ) }}%
+
+                            </span>
+
+                        </div>
+
+                    {% endfor %}
+
+                {% else %}
+
+                    <p class="text-muted">
+                        None detected.
+                    </p>
+
+                {% endif %}
+
+            </div>
+
+
+            <!-- RANKED CLAIMS -->
+
+            <div class="col-md-4">
+
+                <h5 class="h6">
+                    Ranked Claims
+                </h5>
+
+
+                {% if crawl_ranked_claims %}
+
+                    {% for item in crawl_ranked_claims %}
+
+                        <div class="border-bottom py-1">
+
+                            {{ item.get(
+                                "normalized",
+                                "—"
+                            ) }}
+
+
+                            <span class="float-end">
+
+                                {{ item.get(
+                                    "priority_score",
+                                    "—"
+                                ) }}
+
+                            </span>
+
+                        </div>
+
+                    {% endfor %}
+
+                {% else %}
+
+                    <p class="text-muted">
+                        None detected.
+                    </p>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+
+        <!-- ================================================= -->
+        <!-- NORMALIZED / RANKED INGREDIENTS -->
+        <!-- ================================================= -->
+
+        <div class="row mt-4">
+
+
+            <!-- NORMALIZED INGREDIENTS -->
+
+            <div class="col-md-6">
+
+                <h5 class="h6">
+                    Normalized Ingredients
+                </h5>
+
+
+                {% if crawl_normalized_ingredients %}
+
+                    {% for item in crawl_normalized_ingredients %}
+
+                        <div class="border-bottom py-1">
+
+                            {{ item.get(
+                                "text",
+                                "—"
+                            ) }}
+
+                            →
+
+                            {{ item.get(
+                                "normalized",
+                                "—"
+                            ) }}
+
+
+                            <span class="text-muted">
+
+                                {{ item.get(
+                                    "confidence",
+                                    "—"
+                                ) }}%
+
+                            </span>
+
+                        </div>
+
+                    {% endfor %}
+
+                {% else %}
+
+                    <p class="text-muted">
+                        None detected.
+                    </p>
+
+                {% endif %}
+
+            </div>
+
+
+            <!-- RANKED INGREDIENTS -->
+
+            <div class="col-md-6">
+
+                <h5 class="h6">
+                    Ranked Ingredients
+                </h5>
+
+
+                {% if crawl_ranked_ingredients %}
+
+                    {% for item in crawl_ranked_ingredients %}
+
+                        <div class="border-bottom py-1">
+
+                            {{ item.get(
+                                "normalized",
+                                "—"
+                            ) }}
+
+
+                            <span class="float-end">
+
+                                {{ item.get(
+                                    "priority_score",
+                                    "—"
+                                ) }}
+
+                            </span>
+
+                        </div>
+
+                    {% endfor %}
+
+                {% else %}
+
+                    <p class="text-muted">
+                        None detected.
+                    </p>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+
+        <!-- ================================================= -->
+        <!-- PIPELINE INFORMATION -->
+        <!-- ================================================= -->
+
+        <div class="alert alert-info mt-4 mb-0">
+
+            <strong>
+                V4 → V3 Pipeline:
+            </strong>
+
+            Web Crawler →
+            Information Extraction →
+            NLP Normalization →
+            Relevance Ranking →
+            FoodGrade Assessment
+
+            <br>
+            <br>
+
+            <span class="small">
+
+                NLP confidence, relevance ranking and FoodGrade
+                score are separate concepts. The current A–E
+                grading engine remains the prototype methodology.
+
+            </span>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endif %}
+
+
+{% endblock %}

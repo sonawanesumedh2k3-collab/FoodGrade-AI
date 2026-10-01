@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Methodology - FoodGrade AI{% endblock %}
+{% block content %}
+<div class="mb-4">
+  <h1 class="h3">FoodGrade AI V2.5 Methodology</h1>
+  <p class="text-muted">This version freezes the research methodology before NLP, web crawling, OCR, recommendation and ML are added.</p>
+</div>
+<div class="alert alert-warning"><strong>Research prototype:</strong> The A–E health grade is a FoodGrade research label, not an official FSSAI rating or medical recommendation.</div>
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card h-100"><div class="card-body p-4">
+      <h2 class="h5">Two separate grades</h2>
+      <ul><li><strong>Claim Grade:</strong> checks whether detected product claims are supported by available label data and applicable FSSAI claim criteria.</li><li><strong>Health Grade:</strong> evaluates the nutrition profile separately.</li></ul>
+      <p class="mb-0">An accurate claim does not automatically mean the whole product is healthy.</p>
+    </div></div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100"><div class="card-body p-4">
+      <h2 class="h5">Health model weights</h2>
+      <table class="table table-sm"><tbody><tr><td>Sugar</td><td>20%</td></tr><tr><td>Saturated fat</td><td>20%</td></tr><tr><td>Sodium / salt</td><td>20%</td></tr><tr><td>Energy</td><td>10%</td></tr><tr><td>Fibre</td><td>15%</td></tr><tr><td>Protein</td><td>15%</td></tr></tbody></table>
+    </div></div>
+  </div>
+</div>
+<div class="card mt-4"><div class="card-body p-4">
+<h2 class="h5">Claim verification examples</h2>
+<div class="table-responsive"><table class="table table-bordered align-middle"><thead><tr><th>Claim</th><th>Research reference</th></tr></thead><tbody>
+<tr><td>Low sugar</td><td>≤ 5 g/100 g for solids or ≤ 2.5 g/100 ml for liquids</td></tr>
+<tr><td>High protein</td><td>20% of RDA/100 g for solids; 10%/100 ml for liquids; or 10%/100 kcal</td></tr>
+<tr><td>High fibre</td><td>≥ 6 g/100 g or ≥ 3 g/100 kcal</td></tr>
+<tr><td>Low sodium</td><td>≤ 0.12 g sodium/100 g or 100 ml</td></tr>
+<tr><td>Low saturated fat</td><td>≤ 1.5 g/100 g solids or ≤ 0.75 g/100 ml liquids, subject to FSSAI's additional condition</td></tr>
+</tbody></table></div>
+<p class="small text-muted mb-0">These are claim-use criteria from FSSAI; they are not themselves a universal definition of a healthy food.</p>
+</div></div>
+<div class="card mt-4"><div class="card-body p-4">
+<h2 class="h5">Dataset labeling</h2>
+<p>Every product should keep the original source, normalized nutrition values, detected claim, claim status, evidence/reason, claim grade, health grade and data-quality information.</p>
+<a class="btn btn-dark" href="{{ url_for('data_center') }}">Back to Data Center</a>
+</div></div>
+{% endblock %}

@@ -1,0 +1,418 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container py-4">
+
+    <!-- ================================================= -->
+    <!-- TITLE -->
+    <!-- ================================================= -->
+
+    <div class="mb-4">
+
+        <h2>FoodGrade AI</h2>
+
+        <p class="text-muted">
+            Intelligent Food Product Quality Assessment System
+        </p>
+
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- PROBLEM STATEMENT -->
+    <!-- ================================================= -->
+
+    <div class="card mb-4">
+
+        <div class="card-header">
+            <strong>1. Problem Statement</strong>
+        </div>
+
+        <div class="card-body">
+
+            <p>
+                Consumers often find it difficult to evaluate packaged
+                food products because product labels contain multiple
+                ingredients, nutritional values and marketing claims.
+            </p>
+
+            <p class="mb-0">
+                FoodGrade AI provides an intelligent system for analysing
+                food-product information and generating separate health
+                and claim assessments.
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- OBJECTIVES -->
+    <!-- ================================================= -->
+
+    <div class="card mb-4">
+
+        <div class="card-header">
+            <strong>2. Objectives</strong>
+        </div>
+
+        <div class="card-body">
+
+            <ol>
+
+                <li>
+                    Collect food-product information from multiple sources.
+                </li>
+
+                <li>
+                    Extract ingredients, nutritional information and claims.
+                </li>
+
+                <li>
+                    Apply NLP and ranking techniques to product content.
+                </li>
+
+                <li>
+                    Generate separate Health Grade and Claim Grade.
+                </li>
+
+                <li>
+                    Recommend similar food products using content-based
+                    similarity.
+                </li>
+
+                <li>
+                    Demonstrate machine-learning based health-grade
+                    prediction.
+                </li>
+
+            </ol>
+
+        </div>
+
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- ARCHITECTURE -->
+    <!-- ================================================= -->
+
+    <div class="card mb-4">
+
+        <div class="card-header">
+            <strong>3. System Architecture</strong>
+        </div>
+
+        <div class="card-body">
+
+            <div class="text-center">
+
+                <div class="border rounded p-3 mb-2">
+                    Product Input
+                </div>
+
+                <div>↓</div>
+
+                <div class="border rounded p-3 mb-2">
+                    Web Retrieval / Open Food Facts / OCR
+                </div>
+
+                <div>↓</div>
+
+                <div class="border rounded p-3 mb-2">
+                    Information Extraction
+                </div>
+
+                <div>↓</div>
+
+                <div class="border rounded p-3 mb-2">
+                    NLP + Ranking
+                </div>
+
+                <div>↓</div>
+
+                <div class="border rounded p-3 mb-2">
+                    FoodGrade Engine
+                </div>
+
+                <div>↓</div>
+
+                <div class="row justify-content-center">
+
+                    <div class="col-md-4">
+
+                        <div class="border rounded p-3">
+                            Health Grade A–E
+                        </div>
+
+                    </div>
+
+                    <div class="col-md-4">
+
+                        <div class="border rounded p-3">
+                            Claim Grade A–E
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="mt-2">↓</div>
+
+                <div class="border rounded p-3">
+                    Content-Based Recommendation
+                </div>
+
+                <div class="mt-2">↓</div>
+
+                <div class="border rounded p-3">
+                    Machine Learning & Evaluation
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- MODULES -->
+    <!-- ================================================= -->
+
+    <div class="card mb-4">
+
+        <div class="card-header">
+            <strong>4. Implemented Modules</strong>
+        </div>
+
+        <div class="card-body">
+
+            <table class="table table-bordered">
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            Module
+                        </th>
+
+                        <th>
+                            Implementation
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    <tr>
+                        <td>V1 / V2</td>
+                        <td>Flask application, SQLite and product data management</td>
+                    </tr>
+
+                    <tr>
+                        <td>V3</td>
+                        <td>Information Extraction, NLP and Ranking</td>
+                    </tr>
+
+                    <tr>
+                        <td>V4</td>
+                        <td>Web Retrieval, BeautifulSoup and Scrapy</td>
+                    </tr>
+
+                    <tr>
+                        <td>V5</td>
+                        <td>OCR and Content-Based Recommendation</td>
+                    </tr>
+
+                    <tr>
+                        <td>V6</td>
+                        <td>Random Forest Machine Learning</td>
+                    </tr>
+
+                    <tr>
+                        <td>V7</td>
+                        <td>Testing and Validation</td>
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- TECHNOLOGY STACK -->
+    <!-- ================================================= -->
+
+    <div class="card mb-4">
+
+        <div class="card-header">
+            <strong>5. Technology Stack</strong>
+        </div>
+
+        <div class="card-body">
+
+            <div class="row">
+
+                <div class="col-md-6">
+
+                    <h6>Backend</h6>
+
+                    <ul>
+
+                        <li>Python</li>
+                        <li>Flask</li>
+                        <li>SQLite</li>
+
+                    </ul>
+
+                </div>
+
+
+                <div class="col-md-6">
+
+                    <h6>Data & AI</h6>
+
+                    <ul>
+
+                        <li>Pandas</li>
+                        <li>Scikit-learn</li>
+                        <li>TF-IDF</li>
+                        <li>Cosine Similarity</li>
+                        <li>Random Forest</li>
+
+                    </ul>
+
+                </div>
+
+
+                <div class="col-md-6">
+
+                    <h6>Information Retrieval</h6>
+
+                    <ul>
+
+                        <li>Requests</li>
+                        <li>BeautifulSoup</li>
+                        <li>Scrapy</li>
+
+                    </ul>
+
+                </div>
+
+
+                <div class="col-md-6">
+
+                    <h6>Image Processing</h6>
+
+                    <ul>
+
+                        <li>Tesseract OCR</li>
+                        <li>pytesseract</li>
+                        <li>Pillow</li>
+
+                    </ul>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- WORKFLOW -->
+    <!-- ================================================= -->
+
+    <div class="card mb-4">
+
+        <div class="card-header">
+            <strong>6. End-to-End Workflow</strong>
+        </div>
+
+        <div class="card-body">
+
+            <ol>
+
+                <li>
+                    User enters or uploads a food product.
+                </li>
+
+                <li>
+                    Product information is retrieved or extracted.
+                </li>
+
+                <li>
+                    Ingredients, nutrition and claims are identified.
+                </li>
+
+                <li>
+                    NLP normalizes and ranks relevant product information.
+                </li>
+
+                <li>
+                    FoodGrade calculates Health and Claim grades.
+                </li>
+
+                <li>
+                    Similar products are identified using content similarity.
+                </li>
+
+                <li>
+                    The ML module demonstrates health-grade prediction.
+                </li>
+
+                <li>
+                    V7 validates the major system components.
+                </li>
+
+            </ol>
+
+        </div>
+
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- VALIDATION -->
+    <!-- ================================================= -->
+
+    <div class="alert alert-success">
+
+        <strong>System Validation:</strong>
+
+        The current V7 validation run successfully passed
+        all 6 implemented component checks.
+
+    </div>
+
+
+    <!-- ================================================= -->
+    <!-- NOTE -->
+    <!-- ================================================= -->
+
+    <div class="alert alert-info">
+
+        <strong>Research Note:</strong>
+
+        Some prototype grading and machine-learning components
+        use demonstration data and rules. Larger validated
+        datasets and further evaluation can be incorporated
+        in future development.
+
+    </div>
+
+</div>
+
+{% endblock %}
