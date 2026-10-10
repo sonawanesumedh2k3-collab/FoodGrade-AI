@@ -1,10 +1,459 @@
-{% extends "base.html" %}{% block title %}{{ product['product_name'] }} - FoodGrade AI{% endblock %}{% block content %}
-<div class="d-flex justify-content-between align-items-start mb-4"><div><h1 class="h3 mb-1">{{ product['product_name'] }}</h1><p class="text-muted mb-0">{{ product['brand'] }} · {{ product['category'] }}</p></div><a class="btn btn-outline-dark" href="{{ url_for('products') }}">Back</a><a class="btn btn-primary"
-   href="{{ url_for('v3_analyze', product_id=product['id']) }}">
-    Analyze with V3.1
-</a></div>
-<div class="row g-3 mb-4"><div class="col-md-6"><div class="card score-card h-100"><div class="card-body text-center"><div class="text-muted">Health Grade</div><div class="big-grade grade-{{ product['health_grade'] }}">{{ product['health_grade'] }}</div><div class="fw-bold">{{ product['health_score'] }}/100</div></div></div></div><div class="col-md-6"><div class="card score-card h-100"><div class="card-body text-center"><div class="text-muted">Claim Grade</div><div class="big-grade grade-{{ product['claim_grade'] }}">{{ product['claim_grade'] }}</div><div class="fw-bold">{{ product['claim_score'] }}/100</div></div></div></div></div>
-<div class="row g-3"><div class="col-lg-6"><div class="card h-100"><div class="card-body"><h2 class="h5">Nutrition</h2><table class="table table-sm"><tr><td>Calories</td><td>{{ product['calories'] }} kcal</td></tr><tr><td>Sugar</td><td>{{ product['sugar'] }} g</td></tr><tr><td>Total fat</td><td>{{ product['total_fat'] }} g</td></tr><tr><td>Saturated fat</td><td>{{ product['saturated_fat'] }} g</td></tr><tr><td>Protein</td><td>{{ product['protein'] }} g</td></tr><tr><td>Fibre</td><td>{{ product['fibre'] }} g</td></tr><tr><td>Salt</td><td>{{ product['salt'] }} g</td></tr></table></div></div></div><div class="col-lg-6"><div class="card h-100"><div class="card-body"><h2 class="h5">Ingredients & Claims</h2><p><strong>Ingredients:</strong><br>{{ product['ingredients'] or 'Not provided' }}</p><p><strong>Claims:</strong><br>{{ product['claims'] or 'No claims entered' }}</p><p><strong>Source:</strong> {{ product['source'] }}{% if product['source_url'] %} · <a href="{{ product['source_url'] }}" target="_blank">View source</a>{% endif %}</p><p><strong>Data quality:</strong> {{ product['data_quality_score'] }}/100</p></div></div></div></div>
-<div class="alert alert-info mt-4"><strong>V2:</strong> Open Food Facts data can now be imported and stored locally. The grading rules are still the V1 prototype rules.</div>
-<form method="post" action="{{ url_for('delete_product', product_id=product['id']) }}" onsubmit="return confirm('Delete this product?');"><button class="btn btn-sm btn-outline-danger">Delete product</button></form>
+{% extends "base.html" %}
+{% block title %}{{ product['product_name'] }} - FoodGrade AI{% endblock %}
+
+{% block content %}
+
+{# ── Top Header ── #}
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <h1 class="h3 mb-1 fw-bold text-dark">{{ product['product_name'] }}</h1>
+    <p class="text-muted mb-0">
+      <span class="badge bg-light text-dark border me-1">{{ product['brand'] or 'Unbranded' }}</span>
+      <span class="badge bg-light text-dark border me-1">{{ product['category'] or 'Packaged Food' }}</span>
+      {% if product['barcode'] %}
+        <span class="text-secondary small">Barcode: <code>{{ product['barcode'] }}</code></span>
+      {% endif %}
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-dark" href="{{ url_for('products') }}">← Back to Catalog</a>
+    <a class="btn btn-primary" href="{{ url_for('v3_analyze', product_id=product['id']) }}">Analyze with V3.1</a>
+  </div>
+</div>
+
+{# ── Missing Data / Completeness Warning ── #}
+{% if foodgrade and foodgrade.missing_fields %}
+<div class="alert alert-warning d-flex align-items-center mb-4" role="alert">
+  <div class="me-2 fs-4">⚠</div>
+  <div>
+    <strong>Incomplete Nutrition Label:</strong>
+    Missing values for <code>{{ foodgrade.missing_fields | join(', ') }}</code>.
+    In accordance with the FoodGrade V2.5 methodology, undeclared nutrients are not treated as zero; a neutral reference score (50/100) is applied, and data completeness is reduced to <strong>{{ foodgrade.data_quality_score }}%</strong>.
+  </div>
+</div>
+{% endif %}
+
+{# ── Primary Grade Cards: Separate Health Grade and Claim Accuracy Grade ── #}
+<div class="row g-3 mb-4">
+  {# Health Grade Card #}
+  <div class="col-md-4">
+    <div class="card h-100 shadow-sm border-0" style="border-radius: 12px; border-left: 5px solid #0f4c5c !important;">
+      <div class="card-body text-center p-4">
+        <div class="text-uppercase text-muted small fw-bold tracking-wide mb-1">Health Grade (A–E)</div>
+        <div class="display-3 fw-bold my-2 grade-{{ product['health_grade'] }}" style="line-height: 1;">
+          {{ product['health_grade'] }}
+        </div>
+        <div class="fs-5 fw-bold text-dark">{{ product['health_score'] }} <span class="text-muted fs-6">/ 100</span></div>
+        <div class="small text-muted mt-2">
+          Deterministic 6-Dimension Score
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# Claim Grade Card #}
+  <div class="col-md-4">
+    <div class="card h-100 shadow-sm border-0" style="border-radius: 12px; border-left: 5px solid #e36414 !important;">
+      <div class="card-body text-center p-4">
+        <div class="text-uppercase text-muted small fw-bold tracking-wide mb-1">Claim Accuracy Grade (A–E)</div>
+        <div class="display-3 fw-bold my-2 grade-{{ product['claim_grade'] }}" style="line-height: 1;">
+          {{ product['claim_grade'] }}
+        </div>
+        <div class="fs-5 fw-bold text-dark">{{ product['claim_score'] }} <span class="text-muted fs-6">/ 100</span></div>
+        <div class="mt-2">
+          {% if foodgrade and foodgrade.claim_status == 'VERIFIED' %}
+            <span class="badge bg-success">VERIFIED</span>
+          {% elif foodgrade and foodgrade.claim_status == 'NOT_VERIFIED' %}
+            <span class="badge bg-danger">NOT VERIFIED</span>
+          {% elif foodgrade and foodgrade.claim_status == 'INSUFFICIENT_EVIDENCE' %}
+            <span class="badge bg-warning text-dark">INSUFFICIENT EVIDENCE</span>
+          {% else %}
+            <span class="badge bg-secondary">NO CLAIMS DETECTED</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ML Health Grade Card #}
+  <div class="col-md-4">
+    <div class="card h-100 shadow-sm border-0" style="border-radius: 12px; border-left: 5px solid #588157 !important;">
+      <div class="card-body p-4 text-center">
+        <div class="text-uppercase text-muted small fw-bold tracking-wide mb-1">ML Predicted Grade</div>
+        {% if ml_prediction %}
+          <div class="display-3 fw-bold my-2 text-dark" style="line-height: 1;">
+            {{ ml_prediction.grade }}
+          </div>
+          <div class="small fw-bold text-secondary mb-2">
+            Confidence: {{ ml_prediction.top_confidence }}% (Random Forest)
+          </div>
+          {% if ml_prediction.confidence %}
+            <div class="d-flex justify-content-center gap-1 mb-2">
+              {% for g, p in ml_prediction.confidence.items() %}
+                <span class="badge {% if g == ml_prediction.grade %}bg-dark text-white{% else %}bg-light text-muted border{% endif %}" style="font-size: 0.72rem;">
+                  {{ g }}: {{ p }}%
+                </span>
+              {% endfor %}
+            </div>
+          {% endif %}
+          <div class="small text-muted" style="font-size: 0.8rem;">
+            {{ ml_prediction.comparison_note }}
+          </div>
+        {% else %}
+          <div class="text-muted py-3">ML model not loaded</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── 6-Dimension Score Breakdown ── #}
+{% if foodgrade and foodgrade.dimension_scores %}
+<div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
+  <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+    <h2 class="h5 mb-0 fw-bold text-dark">
+      <span class="text-success me-2">●</span>Transparent 6-Dimension Health Score Breakdown
+    </h2>
+    <span class="badge bg-light text-dark border">FoodGrade V2.5 Standard</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Nutritional Dimension</th>
+            <th class="text-center">Weight</th>
+            <th class="text-center">Declared Value</th>
+            <th class="text-center">Dimension Score (0–100)</th>
+            <th class="text-center">Weighted Points</th>
+            <th>Impact Rationale</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Total Sugar</strong></td>
+            <td class="text-center"><span class="badge bg-secondary">20%</span></td>
+            <td class="text-center fw-bold">{{ product['sugar'] }} g</td>
+            <td class="text-center">
+              <span class="fw-bold {% if foodgrade.dimension_scores.sugar >= 70 %}text-success{% elif foodgrade.dimension_scores.sugar >= 50 %}text-warning{% else %}text-danger{% endif %}">
+                {{ foodgrade.dimension_scores.sugar }}
+              </span>
+            </td>
+            <td class="text-center fw-bold">{{ (0.20 * foodgrade.dimension_scores.sugar) | round(2) }}</td>
+            <td class="small text-muted">Lower is better (&le;5g positive, &gt;22.5g heavy penalty)</td>
+          </tr>
+          <tr>
+            <td><strong>Saturated Fat</strong></td>
+            <td class="text-center"><span class="badge bg-secondary">20%</span></td>
+            <td class="text-center fw-bold">{{ product['saturated_fat'] }} g</td>
+            <td class="text-center">
+              <span class="fw-bold {% if foodgrade.dimension_scores.saturated_fat >= 70 %}text-success{% elif foodgrade.dimension_scores.saturated_fat >= 50 %}text-warning{% else %}text-danger{% endif %}">
+                {{ foodgrade.dimension_scores.saturated_fat }}
+              </span>
+            </td>
+            <td class="text-center fw-bold">{{ (0.20 * foodgrade.dimension_scores.saturated_fat) | round(2) }}</td>
+            <td class="small text-muted">Lower is better (&le;1.5g positive, &gt;10g penalty)</td>
+          </tr>
+          <tr>
+            <td><strong>Sodium / Salt</strong></td>
+            <td class="text-center"><span class="badge bg-secondary">20%</span></td>
+            <td class="text-center fw-bold">{{ product['salt'] }} g</td>
+            <td class="text-center">
+              <span class="fw-bold {% if foodgrade.dimension_scores.salt >= 70 %}text-success{% elif foodgrade.dimension_scores.salt >= 50 %}text-warning{% else %}text-danger{% endif %}">
+                {{ foodgrade.dimension_scores.salt }}
+              </span>
+            </td>
+            <td class="text-center fw-bold">{{ (0.20 * foodgrade.dimension_scores.salt) | round(2) }}</td>
+            <td class="small text-muted">Lower is better (&le;0.3g positive, &gt;1.5g penalty)</td>
+          </tr>
+          <tr>
+            <td><strong>Energy (Calories)</strong></td>
+            <td class="text-center"><span class="badge bg-secondary">10%</span></td>
+            <td class="text-center fw-bold">{{ product['calories'] }} kcal</td>
+            <td class="text-center">
+              <span class="fw-bold {% if (foodgrade.dimension_scores.energy or foodgrade.dimension_scores.calories or 0) >= 70 %}text-success{% elif (foodgrade.dimension_scores.energy or foodgrade.dimension_scores.calories or 0) >= 50 %}text-warning{% else %}text-danger{% endif %}">
+                {{ foodgrade.dimension_scores.energy if 'energy' in foodgrade.dimension_scores else foodgrade.dimension_scores.calories }}
+              </span>
+            </td>
+            <td class="text-center fw-bold">{{ (0.10 * (foodgrade.dimension_scores.energy or foodgrade.dimension_scores.calories or 0)) | round(2) }}</td>
+            <td class="small text-muted">Lower is preferable for snacks (&le;150 kcal baseline)</td>
+          </tr>
+          <tr>
+            <td><strong>Dietary Fibre</strong></td>
+            <td class="text-center"><span class="badge bg-secondary">15%</span></td>
+            <td class="text-center fw-bold">{{ product['fibre'] }} g</td>
+            <td class="text-center">
+              <span class="fw-bold {% if foodgrade.dimension_scores.fibre >= 70 %}text-success{% elif foodgrade.dimension_scores.fibre >= 50 %}text-warning{% else %}text-danger{% endif %}">
+                {{ foodgrade.dimension_scores.fibre }}
+              </span>
+            </td>
+            <td class="text-center fw-bold">{{ (0.15 * foodgrade.dimension_scores.fibre) | round(2) }}</td>
+            <td class="small text-muted">Higher is better (&ge;6g high fibre bonus)</td>
+          </tr>
+          <tr>
+            <td><strong>Protein</strong></td>
+            <td class="text-center"><span class="badge bg-secondary">15%</span></td>
+            <td class="text-center fw-bold">{{ product['protein'] }} g</td>
+            <td class="text-center">
+              <span class="fw-bold {% if foodgrade.dimension_scores.protein >= 70 %}text-success{% elif foodgrade.dimension_scores.protein >= 50 %}text-warning{% else %}text-danger{% endif %}">
+                {{ foodgrade.dimension_scores.protein }}
+              </span>
+            </td>
+            <td class="text-center fw-bold">{{ (0.15 * foodgrade.dimension_scores.protein) | round(2) }}</td>
+            <td class="small text-muted">Higher is better (&ge;10g high protein bonus)</td>
+          </tr>
+        </tbody>
+        <tfoot class="table-light">
+          <tr>
+            <th colspan="4" class="text-end">Final Health Score:</th>
+            <th class="text-center fs-5 text-dark">{{ product['health_score'] }} / 100</th>
+            <th class="fw-bold">Health Grade: <span class="badge grade-{{ product['health_grade'] }}">{{ product['health_grade'] }}</span></th>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    {% if foodgrade.health_reasons %}
+    <div class="p-3 bg-light border-top">
+      <div class="small fw-bold text-secondary mb-2">SCORING INFLUENCES:</div>
+      <ul class="mb-0 small text-muted">
+        {% for r in foodgrade.health_reasons %}
+          <li>{{ r }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{# ── FSSAI Claim Verification Section ── #}
+<div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
+  <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+    <h2 class="h5 mb-0 fw-bold text-dark">
+      <span class="text-warning me-2">●</span>FSSAI Claim Verification &amp; Evidence
+    </h2>
+    <span class="badge bg-light text-dark border">FSSAI Advertising &amp; Claims 2018</span>
+  </div>
+  <div class="card-body">
+    {% if foodgrade and foodgrade.claim_details %}
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Detected Claim</th>
+              <th>Status</th>
+              <th>Score</th>
+              <th>FSSAI Statutory Rule</th>
+              <th>Verification Evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in foodgrade.claim_details %}
+            <tr>
+              <td><strong>{{ item.claim }}</strong></td>
+              <td>
+                {% if item.status == 'VERIFIED' %}
+                  <span class="badge bg-success">VERIFIED</span>
+                {% elif item.status == 'NOT_VERIFIED' %}
+                  <span class="badge bg-danger">NOT VERIFIED</span>
+                {% elif item.status == 'INSUFFICIENT_EVIDENCE' %}
+                  <span class="badge bg-warning text-dark">INSUFFICIENT EVIDENCE</span>
+                {% else %}
+                  <span class="badge bg-secondary">{{ item.status }}</span>
+                {% endif %}
+              </td>
+              <td class="fw-bold">{{ item.score }}/100</td>
+              <td class="small">{{ item.rule }}</td>
+              <td class="small text-muted">{{ item.evidence }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-muted mb-0">
+        <em>No marketing or nutritional claims detected on this product label.</em>
+        A product without claims receives Claim Grade E and status <code>NO_CLAIMS_DETECTED</code>.
+      </p>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Nutrition Facts & Product Info ── #}
+<div class="row g-3 mb-4">
+  <div class="col-lg-6">
+    <div class="card h-100 shadow-sm border-0" style="border-radius: 12px;">
+      <div class="card-body">
+        <h2 class="h5 fw-bold mb-3">Declared Nutrition Facts</h2>
+        <table class="table table-sm table-striped">
+          <tr><td>Calories (Energy)</td><td class="text-end fw-bold">{{ product['calories'] }} kcal</td></tr>
+          <tr><td>Total Sugars</td><td class="text-end fw-bold">{{ product['sugar'] }} g</td></tr>
+          <tr><td>Total Fat</td><td class="text-end fw-bold">{{ product['total_fat'] }} g</td></tr>
+          <tr><td>Saturated Fat</td><td class="text-end fw-bold">{{ product['saturated_fat'] }} g</td></tr>
+          <tr><td>Protein</td><td class="text-end fw-bold">{{ product['protein'] }} g</td></tr>
+          <tr><td>Dietary Fibre</td><td class="text-end fw-bold">{{ product['fibre'] }} g</td></tr>
+          <tr><td>Salt / Sodium</td><td class="text-end fw-bold">{{ product['salt'] }} g</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100 shadow-sm border-0" style="border-radius: 12px;">
+      <div class="card-body">
+        <h2 class="h5 fw-bold mb-3">Product Information</h2>
+        <p class="mb-2"><strong>Ingredients:</strong><br><span class="text-muted">{{ product['ingredients'] or 'Not declared' }}</span></p>
+        <p class="mb-2"><strong>Claims:</strong><br><span class="text-muted">{{ product['claims'] or 'None' }}</span></p>
+        <p class="mb-2">
+          <strong>Source:</strong> <span class="badge bg-secondary">{{ product['source'] }}</span>
+          {% if product['source_url'] %} · <a href="{{ product['source_url'] }}" target="_blank" class="small">View source</a>{% endif %}
+        </p>
+        <p class="mb-0">
+          <strong>Data Quality Score:</strong>
+          <span class="fw-bold {% if product['data_quality_score'] >= 80 %}text-success{% elif product['data_quality_score'] >= 50 %}text-warning{% else %}text-danger{% endif %}">
+            {{ product['data_quality_score'] }}/100
+          </span>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Recommendations Tabs ── #}
+{% if similar_products or healthier_alternatives %}
+<div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
+  <div class="card-header bg-white py-3 border-bottom">
+    <strong class="h5 mb-0 text-dark">Intelligent Product Recommendations</strong>
+  </div>
+  <div class="card-body p-0">
+    <ul class="nav nav-tabs px-3 pt-2" id="recTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="similar-tab" data-bs-toggle="tab"
+                data-bs-target="#similar-panel" type="button" role="tab">
+          Similar Products
+          {% if similar_products %}<span class="badge bg-secondary ms-1">{{ similar_products|length }}</span>{% endif %}
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="healthier-tab" data-bs-toggle="tab"
+                data-bs-target="#healthier-panel" type="button" role="tab">
+          Healthier Alternatives
+          {% if healthier_alternatives %}<span class="badge bg-success ms-1">{{ healthier_alternatives|length }}</span>{% endif %}
+        </button>
+      </li>
+    </ul>
+
+    <div class="tab-content p-3">
+      {# — Similar Products panel — #}
+      <div class="tab-pane fade show active" id="similar-panel" role="tabpanel">
+        {% if similar_products %}
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0 align-middle">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Brand</th>
+                <th>Health Grade</th>
+                <th>Similarity</th>
+                <th>Recommendation Reasons</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for rec in similar_products %}
+              <tr>
+                <td>
+                  <a href="{{ url_for('product_detail', product_id=rec.product.id) }}" class="fw-bold text-decoration-none">
+                    {{ rec.product.product_name }}
+                  </a>
+                </td>
+                <td>{{ rec.product.brand or '—' }}</td>
+                <td>
+                  <span class="badge grade-{{ rec.product.health_grade }}">
+                    {{ rec.product.health_grade }}
+                  </span>
+                </td>
+                <td>{{ rec.similarity }}%</td>
+                <td>
+                  {% if rec.reasons %}
+                    {% for r in rec.reasons %}
+                      <span class="badge bg-light text-dark border me-1">{{ r }}</span>
+                    {% endfor %}
+                  {% else %}
+                    <span class="text-muted small">{{ rec.reasons_text or 'Content match' }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">No similar products found in the catalog.</p>
+        {% endif %}
+      </div>
+
+      {# — Healthier Alternatives panel — #}
+      <div class="tab-pane fade" id="healthier-panel" role="tabpanel">
+        {% if healthier_alternatives %}
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0 align-middle">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Brand</th>
+                <th>Health Grade</th>
+                <th>Health Score</th>
+                <th>Why It's Healthier</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for rec in healthier_alternatives %}
+              <tr>
+                <td>
+                  <a href="{{ url_for('product_detail', product_id=rec.product.id) }}" class="fw-bold text-decoration-none text-success">
+                    {{ rec.product.product_name }}
+                  </a>
+                </td>
+                <td>{{ rec.product.brand or '—' }}</td>
+                <td>
+                  <span class="badge grade-{{ rec.health_grade }}">
+                    {{ rec.health_grade }}
+                  </span>
+                </td>
+                <td>{{ rec.health_score }}/100</td>
+                <td>
+                  {% if rec.reasons %}
+                    {% for r in rec.reasons %}
+                      <span class="badge bg-success bg-opacity-10 text-success border border-success me-1">{{ r }}</span>
+                    {% endfor %}
+                  {% else %}
+                    <span class="text-muted small">{{ rec.reasons_text or 'Superior health score' }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">
+          No healthier alternatives found. This product may already have the best health score in its category.
+        </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
+  <div class="small text-muted">
+    FoodGrade AI Academic Prototype · 6-Dimension Health Model + FSSAI Claim Verification
+  </div>
+  <form method="post" action="{{ url_for('delete_product', product_id=product['id']) }}"
+        onsubmit="return confirm('Delete this product?');">
+    <button class="btn btn-sm btn-outline-danger">Delete product</button>
+  </form>
+</div>
+
 {% endblock %}

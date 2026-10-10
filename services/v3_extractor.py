@@ -13,7 +13,10 @@ Later V3 stages will add NLP and language-model processing.
 """
 
 
+from __future__ import annotations
+
 import re
+from typing import Any
 
 
 CLAIM_PATTERNS = {
@@ -157,56 +160,107 @@ def extract_claims(claim_text):
     return extracted
 
 
-def split_ingredients(ingredient_text):
+def parse_compound_ingredient(ingredient_str: str) -> dict[str, Any]:
     """
-    Split ingredient text into individual ingredients.
+    Parse a compound ingredient into base name and its sub-ingredients.
+    E.g. 'Milk Chocolate (Sugar, Cocoa Butter, Milk Powder)' ->
+    {'name': 'Milk Chocolate', 'sub_ingredients': ['Sugar', 'Cocoa Butter', 'Milk Powder']}
     """
+    cleaned = ingredient_str.strip()
+    match = re.search(r"^(.*?)\s*\((.*?)\)$", cleaned)
+    if match:
+        base_name = match.group(1).strip()
+        sub_text = match.group(2).strip()
+        sub_items = [s.strip() for s in re.split(r",|;", sub_text) if s.strip()]
+        return {
+            "name": base_name or cleaned,
+            "raw": cleaned,
+            "is_compound": True,
+            "sub_ingredients": sub_items,
+        }
+    return {
+        "name": cleaned,
+        "raw": cleaned,
+        "is_compound": False,
+        "sub_ingredients": [],
+    }
 
+
+def split_ingredients(ingredient_text: str) -> list[str]:
+    """
+    Split ingredient text into individual ingredients, respecting parentheses
+    and compound ingredients (e.g. 'Milk Chocolate (Sugar, Cocoa Butter, Milk Powder)').
+    """
     if not ingredient_text:
         return []
 
-    parts = re.split(r",|;|\n", str(ingredient_text))
+    text = str(ingredient_text).strip()
+    ingredients: list[str] = []
+    current: list[str] = []
+    depth = 0
 
-    ingredients = []
+    for char in text:
+        if char in "([{":
+            depth += 1
+            current.append(char)
+        elif char in ")]}":
+            depth = max(0, depth - 1)
+            current.append(char)
+        elif char in ",;\n" and depth == 0:
+            item = "".join(current).strip()
+            if item:
+                ingredients.append(item)
+            current = []
+        else:
+            current.append(char)
 
-    for part in parts:
-
-        cleaned = re.sub(r"\([^)]*\)", "", part)
-        cleaned = re.sub(r"\s+", " ", cleaned).strip()
-
-        if cleaned:
-            ingredients.append(cleaned)
+    if current:
+        item = "".join(current).strip()
+        if item:
+            ingredients.append(item)
 
     return ingredients
 
 
-def classify_ingredients(ingredients):
+def classify_ingredients(ingredients: list[str]) -> list[dict[str, Any]]:
     """
-    Identify important ingredient categories.
+    Identify important ingredient categories, inspecting both base names
+    and parenthesized compound sub-ingredients.
     """
-
     detected = []
 
     for ingredient in ingredients:
-
-        normalized = clean_text(ingredient)
+        parsed = parse_compound_ingredient(ingredient)
+        # Search both raw string and sub-ingredients
+        texts_to_check = [ingredient, parsed["name"]] + parsed["sub_ingredients"]
+        all_normalized = " ".join(clean_text(t) for t in texts_to_check)
 
         categories = []
-
         for category, keywords in INGREDIENT_CATEGORIES.items():
-
             for keyword in keywords:
-
-                if keyword in normalized:
+                if keyword in all_normalized:
                     categories.append(category)
                     break
 
         detected.append({
             "ingredient": ingredient,
+            "name": parsed["name"],
+            "is_compound": parsed["is_compound"],
+            "sub_ingredients": parsed["sub_ingredients"],
             "categories": categories
         })
 
     return detected
+
+
+def _get_val(product, key, default=""):
+    if hasattr(product, "get"):
+        return product.get(key, default)
+    try:
+        val = product[key]
+        return val if val is not None else default
+    except (KeyError, IndexError, TypeError):
+        return default
 
 
 def extract_nutrition(product):
@@ -228,7 +282,7 @@ def extract_nutrition(product):
 
     for field, normalized_name, unit in fields:
 
-        value = product[field]
+        value = _get_val(product, field, 0.0)
 
         nutrition.append({
             "name": normalized_name,
@@ -244,9 +298,9 @@ def extract_product_information(product):
     Main V3.1 extraction function.
     """
 
-    claims = extract_claims(product["claims"])
+    claims = extract_claims(_get_val(product, "claims", ""))
 
-    ingredients = split_ingredients(product["ingredients"])
+    ingredients = split_ingredients(_get_val(product, "ingredients", ""))
 
     classified_ingredients = classify_ingredients(ingredients)
 

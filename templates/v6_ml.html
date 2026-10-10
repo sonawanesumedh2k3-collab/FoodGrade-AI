@@ -1,343 +1,274 @@
 {% extends "base.html" %}
 
+{% block title %}V6 — Machine Learning · FoodGrade AI{% endblock %}
+
 {% block content %}
 
 <div class="container py-4">
 
-    <h2>V6 — Machine Learning</h2>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h2 class="mb-0">V6 — Machine Learning</h2>
+      <p class="text-muted mb-0">Random Forest health-grade prediction · nutritional features.</p>
+    </div>
+    <form method="post" action="{{ url_for('v6_train') }}">
+      <button type="submit" class="btn btn-primary">
+        🔁 Train / Retrain Model
+      </button>
+    </form>
+  </div>
 
-    <p class="text-muted">
-        Random Forest based health-grade prediction using
-        nutritional features.
-    </p>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endwith %}
 
 
-    <!-- MODEL INFORMATION -->
+  <!-- 1. MODEL STATUS -->
+  <div class="card mb-4">
+    <div class="card-header"><strong>1. Model Status</strong></div>
+    <div class="card-body">
 
-    <div class="card mb-4">
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        <span class="badge bg-secondary">Random Forest</span>
+        <span class="badge bg-secondary">Classification</span>
+        <span class="badge bg-secondary">A–E Health Grade</span>
+        {% if ml_result.model_state == 'cached' %}
+          <span class="badge bg-info text-dark">📦 Loaded from cache</span>
+        {% elif ml_result.model_state == 'trained' or ml_result.model_state == 'just_trained' %}
+          <span class="badge bg-success">✅ Freshly trained</span>
+        {% else %}
+          <span class="badge bg-warning text-dark">⚠ {{ ml_result.model_state }}</span>
+        {% endif %}
+      </div>
 
-        <div class="card-header">
-            <strong>1. Machine Learning Model</strong>
-        </div>
-
-        <div class="card-body">
-
-            <span class="badge bg-secondary">
-                Random Forest
-            </span>
-
-            <span class="badge bg-secondary">
-                Classification
-            </span>
-
-            <span class="badge bg-secondary">
-                A–E Health Grade
-            </span>
-
-            <p class="mt-3 mb-0">
-                The model automatically trains when this
-                page is opened.
-            </p>
-
-        </div>
+      <p class="mb-1">
+        The model is <strong>not</strong> retrained on every page load.
+        Click <em>Train / Retrain Model</em> to rebuild from the latest data.
+      </p>
+      <p class="text-muted small mb-0">Model file: <code>{{ ml_result.model_path }}</code></p>
 
     </div>
+  </div>
 
 
-    <!-- DATASET -->
+  <!-- 2. DATASET COMPOSITION -->
+  <div class="card mb-4">
+    <div class="card-header"><strong>2. Training Dataset</strong></div>
+    <div class="card-body">
 
-    <div class="card mb-4">
-
-        <div class="card-header">
-            <strong>2. Dataset</strong>
+      <div class="row g-3 mb-3">
+        <div class="col-md-3">
+          <div class="border rounded p-3 text-center">
+            <h2>{{ ml_result.dataset_size }}</h2>
+            <div>Total Samples</div>
+          </div>
         </div>
-
-        <div class="card-body">
-
-            <div class="row">
-
-                <div class="col-md-4">
-
-                    <div class="border rounded p-3 text-center">
-
-                        <h2>
-                            {{ ml_result.dataset_size }}
-                        </h2>
-
-                        <div>
-                            Total Samples
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-                <div class="col-md-4">
-
-                    <div class="border rounded p-3 text-center">
-
-                        <h2>
-                            {{ ml_result.training_size }}
-                        </h2>
-
-                        <div>
-                            Training Samples
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-                <div class="col-md-4">
-
-                    <div class="border rounded p-3 text-center">
-
-                        <h2>
-                            {{ ml_result.testing_size }}
-                        </h2>
-
-                        <div>
-                            Testing Samples
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </div>
-
+        <div class="col-md-3">
+          <div class="border rounded p-3 text-center">
+            <h2>{{ ml_result.training_size }}</h2>
+            <div>Training (80%)</div>
+          </div>
         </div>
+        <div class="col-md-3">
+          <div class="border rounded p-3 text-center">
+            <h2>{{ ml_result.testing_size }}</h2>
+            <div>Testing (20%)</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="border rounded p-3 text-center">
+            <h2>{{ ml_result.accuracy }}%</h2>
+            <div>Test Accuracy</div>
+          </div>
+        </div>
+      </div>
+
+      {% if ml_result.data_sources %}
+      <h6>Data Sources</h6>
+      <table class="table table-sm table-bordered w-auto">
+        <tr><td>Local DB products</td><td class="text-end fw-bold">{{ ml_result.data_sources.db_rows }}</td></tr>
+        <tr><td>OFF India CSV</td><td class="text-end fw-bold">{{ ml_result.data_sources.csv_rows }}</td></tr>
+        <tr><td>Synthetic prototype</td><td class="text-end fw-bold">{{ ml_result.data_sources.synthetic_rows }}</td></tr>
+      </table>
+      {% endif %}
 
     </div>
+  </div>
 
 
-    <!-- ACCURACY -->
+  <!-- 3. CROSS-VALIDATION -->
+  {% if ml_result.cross_val_scores %}
+  <div class="card mb-4">
+    <div class="card-header"><strong>3. Cross-Validation</strong></div>
+    <div class="card-body">
 
-    <div class="card mb-4">
-
-        <div class="card-header">
-            <strong>3. Model Evaluation</strong>
+      <div class="row g-3 mb-3">
+        <div class="col-md-4">
+          <div class="border rounded p-3 text-center">
+            <h3>{{ ml_result.cross_val_mean }}%</h3>
+            <div>Mean CV Accuracy</div>
+          </div>
         </div>
-
-        <div class="card-body text-center">
-
-            <h1>
-                {{ ml_result.accuracy }}%
-            </h1>
-
-            <p class="text-muted">
-                Test Accuracy
-            </p>
-
+        <div class="col-md-4">
+          <div class="border rounded p-3 text-center">
+            <h3>{{ ml_result.cross_val_std }}%</h3>
+            <div>Std Dev</div>
+          </div>
         </div>
+        <div class="col-md-4">
+          <div class="border rounded p-3 text-center">
+            <h3>{{ ml_result.cross_val_scores|length }}</h3>
+            <div>Folds</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex flex-wrap gap-2">
+        {% for score in ml_result.cross_val_scores %}
+          <span class="badge bg-secondary">Fold {{ loop.index }}: {{ score }}%</span>
+        {% endfor %}
+      </div>
 
     </div>
+  </div>
+  {% endif %}
 
 
-    <!-- FEATURE IMPORTANCE -->
+  <!-- 4. FEATURE IMPORTANCE -->
+  <div class="card mb-4">
+    <div class="card-header"><strong>4. Feature Importance</strong></div>
+    <div class="card-body">
 
-    <div class="card mb-4">
-
-        <div class="card-header">
-            <strong>4. Feature Importance</strong>
-        </div>
-
-        <div class="card-body">
-
-            <table class="table table-bordered">
-
-                <thead>
-
-                    <tr>
-                        <th>#</th>
-                        <th>Feature</th>
-                        <th>Importance</th>
-                    </tr>
-
-                </thead>
-
-                <tbody>
-
-                    {% for item in ml_result.feature_importance %}
-
-                    <tr>
-
-                        <td>
-                            {{ loop.index }}
-                        </td>
-
-                        <td>
-                            {{ item.feature }}
-                        </td>
-
-                        <td>
-                            {{ item.importance }}%
-                        </td>
-
-                    </tr>
-
-                    {% endfor %}
-
-                </tbody>
-
-            </table>
-
-        </div>
+      {% if ml_result.feature_importance %}
+      <table class="table table-bordered">
+        <thead>
+          <tr><th>#</th><th>Feature</th><th>Importance</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for item in ml_result.feature_importance %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ item.feature }}</td>
+            <td>{{ item.importance }}%</td>
+            <td style="width:40%">
+              <div class="progress" style="height:12px;">
+                <div class="progress-bar bg-primary" style="width:{{ item.importance }}%"></div>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="text-muted">No feature importance data available.</p>
+      {% endif %}
 
     </div>
+  </div>
 
 
-    <!-- CLASSIFICATION REPORT -->
-
-    <div class="card mb-4">
-
-        <div class="card-header">
-            <strong>5. Classification Report</strong>
-        </div>
-
-        <div class="card-body">
-
-            <table class="table table-bordered">
-
-                <thead>
-
-                    <tr>
-                        <th>Grade</th>
-                        <th>Precision</th>
-                        <th>Recall</th>
-                        <th>F1 Score</th>
-                    </tr>
-
-                </thead>
-
-                <tbody>
-
-                    {% for grade in ml_result.labels %}
-
-                    <tr>
-
-                        <td>
-                            <strong>{{ grade }}</strong>
-                        </td>
-
-                        <td>
-                            {{
-                                "%.2f"|format(
-                                    ml_result.classification_report[
-                                        grade
-                                    ]["precision"]
-                                )
-                            }}
-                        </td>
-
-                        <td>
-                            {{
-                                "%.2f"|format(
-                                    ml_result.classification_report[
-                                        grade
-                                    ]["recall"]
-                                )
-                            }}
-                        </td>
-
-                        <td>
-                            {{
-                                "%.2f"|format(
-                                    ml_result.classification_report[
-                                        grade
-                                    ]["f1-score"]
-                                )
-                            }}
-                        </td>
-
-                    </tr>
-
-                    {% endfor %}
-
-                </tbody>
-
-            </table>
-
-        </div>
-
+  <!-- 5. CLASSIFICATION REPORT -->
+  {% if ml_result.classification_report %}
+  <div class="card mb-4">
+    <div class="card-header"><strong>5. Classification Report</strong></div>
+    <div class="card-body">
+      <table class="table table-bordered">
+        <thead>
+          <tr><th>Grade</th><th>Precision</th><th>Recall</th><th>F1 Score</th><th>Support</th></tr>
+        </thead>
+        <tbody>
+          {% for grade in ml_result.labels %}
+            {% if ml_result.classification_report[grade] is defined %}
+            <tr>
+              <td><strong>{{ grade }}</strong></td>
+              <td>{{ "%.2f"|format(ml_result.classification_report[grade]["precision"]) }}</td>
+              <td>{{ "%.2f"|format(ml_result.classification_report[grade]["recall"]) }}</td>
+              <td>{{ "%.2f"|format(ml_result.classification_report[grade]["f1-score"]) }}</td>
+              <td>{{ ml_result.classification_report[grade]["support"]|int }}</td>
+            </tr>
+            {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
+  </div>
+  {% endif %}
 
 
-    <!-- CONFUSION MATRIX -->
-
-    <div class="card mb-4">
-
-        <div class="card-header">
-            <strong>6. Confusion Matrix</strong>
-        </div>
-
-        <div class="card-body">
-
-            <table class="table table-bordered text-center">
-
-                <thead>
-
-                    <tr>
-
-                        <th>
-                            Actual / Predicted
-                        </th>
-
-                        {% for label in ml_result.labels %}
-
-                        <th>
-                            {{ label }}
-                        </th>
-
-                        {% endfor %}
-
-                    </tr>
-
-                </thead>
-
-                <tbody>
-
-                    {% for row in ml_result.confusion_matrix %}
-
-                    <tr>
-
-                        <th>
-                            {{ ml_result.labels[loop.index0] }}
-                        </th>
-
-                        {% for value in row %}
-
-                        <td>
-                            {{ value }}
-                        </td>
-
-                        {% endfor %}
-
-                    </tr>
-
-                    {% endfor %}
-
-                </tbody>
-
-            </table>
-
-        </div>
-
+  <!-- 6. CONFUSION MATRIX -->
+  {% if ml_result.confusion_matrix %}
+  <div class="card mb-4">
+    <div class="card-header"><strong>6. Confusion Matrix</strong></div>
+    <div class="card-body">
+      <table class="table table-bordered text-center">
+        <thead>
+          <tr>
+            <th>Actual / Predicted</th>
+            {% for label in ml_result.labels %}<th>{{ label }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in ml_result.confusion_matrix %}
+          <tr>
+            <th>{{ ml_result.labels[loop.index0] }}</th>
+            {% for value in row %}
+            <td {% if loop.index0 == loop.index0 and value > 0 %}class="fw-bold"{% endif %}>
+              {{ value }}
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
+  </div>
+  {% endif %}
 
-
-    <div class="alert alert-info">
-
-        <strong>Note:</strong>
-
-        This V6 implementation demonstrates the complete
-        machine-learning workflow using prototype labelled
-        nutritional data. The prototype dataset can later
-        be replaced by a larger validated food dataset.
-
+  {% if ml_result.class_distribution %}
+  <!-- 7. CLASS DISTRIBUTION -->
+  <div class="card mb-4">
+    <div class="card-header"><strong>7. Class Distribution (A–E)</strong></div>
+    <div class="card-body">
+      <p class="text-muted small mb-2">Number of products per health grade in the dataset:</p>
+      <div class="d-flex flex-wrap gap-3">
+        {% for grade, count in ml_result.class_distribution.items() %}
+        <div class="border rounded px-3 py-2 text-center" style="min-width: 90px;">
+          <div class="fw-bold fs-5">{{ grade }}</div>
+          <span class="badge bg-secondary">{{ count }} sample{{ 's' if count != 1 else '' }}</span>
+        </div>
+        {% endfor %}
+      </div>
     </div>
+  </div>
+  {% endif %}
+
+  {% if ml_result.limitations %}
+  <!-- 8. RESEARCH LIMITATIONS -->
+  <div class="card mb-4 border-warning">
+    <div class="card-header bg-warning bg-opacity-10 text-dark">
+      <strong>8. Methodology &amp; Research Limitations</strong>
+    </div>
+    <div class="card-body">
+      <ul class="mb-0">
+        {% for lim in ml_result.limitations %}
+        <li class="mb-1 text-muted">{{ lim }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="alert alert-info">
+    <strong>Phase 2 Note:</strong>
+    The model trains on real DB products + OFF India CSV + 25 synthetic prototype rows.
+    Import more products via <a href="{{ url_for('data_center') }}">Data Center (V2)</a> to improve accuracy.
+    Cross-validation gives a more reliable accuracy estimate than the single test split.
+  </div>
 
 </div>
 

@@ -15,6 +15,11 @@ from services.v3_foodgrade import integrate_foodgrade
 
 def run_v3_pipeline(product):
 
+    if hasattr(product, "keys"):
+        product = {k: product[k] for k in product.keys()}
+    else:
+        product = dict(product)
+
     # --------------------------------
     # V3.1 - Information Extraction
     # --------------------------------

@@ -3,14 +3,11 @@ FoodGrade AI V3.4
 FoodGrade Integration Layer
 
 This module connects the V3 information-processing pipeline
-with the existing FoodGrade grading engine.
+with the FoodGrade V2.5 grading and verification engine.
 
-Important:
-The existing grading engine remains unchanged.
-V3 evidence is attached to the existing FoodGrade result.
-
-The current grading methodology is still prototype-based.
-Final methodology will be established separately.
+V3 evidence (extracted, normalized and ranked claims/ingredients)
+directly feeds into the FSSAI claim verification and six-dimension
+health scoring calculations.
 """
 
 from services.grading_engine import calculate_foodgrade
@@ -18,7 +15,7 @@ from services.grading_engine import calculate_foodgrade
 
 def integrate_foodgrade(product, pipeline_result):
     """
-    Connect V3 pipeline output with the existing FoodGrade engine.
+    Connect V3 pipeline output with the FoodGrade V2.5 engine.
 
     Parameters
     ----------
@@ -31,24 +28,29 @@ def integrate_foodgrade(product, pipeline_result):
     Returns
     -------
     dict
-        Existing FoodGrade result plus V3 evidence.
+        FoodGrade result plus V3 evidence.
     """
 
     # -----------------------------------------
-    # Existing FoodGrade calculation
+    # Product data dictionary
     # -----------------------------------------
-    # Convert SQLite Row to a normal Python dictionary
+    if hasattr(product, "keys"):
+        product_data = {
+            key: product[key]
+            for key in product.keys()
+        }
+    else:
+        product_data = dict(product)
 
-    product_data = {
-        key: product[key]
-        for key in product.keys()
-    }
+    # Calculate FoodGrade assessment passing V3 pipeline results
+    foodgrade_result = calculate_foodgrade(
+        product_data,
+        pipeline_result=pipeline_result
+    )
 
-    foodgrade_result = calculate_foodgrade(product_data)
     # -----------------------------------------
     # V3 evidence
     # -----------------------------------------
-
     extraction = pipeline_result.get(
         "information_extraction",
         {}
@@ -63,10 +65,6 @@ def integrate_foodgrade(product, pipeline_result):
         "ranking",
         {}
     )
-
-    # -----------------------------------------
-    # Evidence summary
-    # -----------------------------------------
 
     evidence = {
         "extracted_claim_count": len(
@@ -101,7 +99,32 @@ def integrate_foodgrade(product, pipeline_result):
         "top_ingredients": ranking.get(
             "ranked_ingredients",
             []
-        )[:5]
+        )[:5],
+
+        "claim_status": foodgrade_result.get(
+            "claim_status",
+            "NO_CLAIMS_DETECTED"
+        ),
+
+        "claim_details": foodgrade_result.get(
+            "claim_details",
+            []
+        ),
+
+        "data_quality_score": foodgrade_result.get(
+            "data_quality_score",
+            0.0
+        ),
+
+        "dimension_scores": foodgrade_result.get(
+            "dimension_scores",
+            {}
+        ),
+
+        "missing_fields": foodgrade_result.get(
+            "missing_fields",
+            []
+        )
     }
 
     return {
@@ -121,6 +144,31 @@ def integrate_foodgrade(product, pipeline_result):
             "claim_grade"
         ],
 
+        "claim_status": foodgrade_result.get(
+            "claim_status",
+            "NO_CLAIMS_DETECTED"
+        ),
+
+        "claim_details": foodgrade_result.get(
+            "claim_details",
+            []
+        ),
+
+        "data_quality_score": foodgrade_result.get(
+            "data_quality_score",
+            0.0
+        ),
+
+        "dimension_scores": foodgrade_result.get(
+            "dimension_scores",
+            {}
+        ),
+
+        "missing_fields": foodgrade_result.get(
+            "missing_fields",
+            []
+        ),
+
         "health_reasons": foodgrade_result[
             "health_reasons"
         ],
@@ -132,5 +180,5 @@ def integrate_foodgrade(product, pipeline_result):
         "v3_evidence": evidence,
 
         "methodology_status":
-            "Current prototype FoodGrade methodology"
+            "FoodGrade V2.5 FSSAI-aligned research methodology"
     }

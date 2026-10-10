@@ -20,7 +20,7 @@ Structured product information
 import re
 from pathlib import Path
 
-from PIL import Image, ImageEnhance, ImageFilter
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 import pytesseract
 from pytesseract import Output
 
@@ -129,22 +129,16 @@ def extract_numbers(text):
 # ============================================================
 
 def prepare_image(image):
+    # Auto-orient based on camera EXIF data (rotation handling)
+    try:
+        image = ImageOps.exif_transpose(image)
+    except Exception:
+        pass
 
-    image = image.convert(
-        "RGB"
-    )
-
-    image = ImageEnhance.Contrast(
-        image
-    ).enhance(1.25)
-
-    image = ImageEnhance.Sharpness(
-        image
-    ).enhance(1.30)
-
-    image = image.filter(
-        ImageFilter.SHARPEN
-    )
+    image = image.convert("RGB")
+    image = ImageEnhance.Contrast(image).enhance(1.30)
+    image = ImageEnhance.Sharpness(image).enhance(1.35)
+    image = image.filter(ImageFilter.SHARPEN)
 
     return image
 
@@ -590,21 +584,27 @@ def extract_nutrition(
         # ----------------------------------------------------
 
         if nutrient == "calories":
-
             if 0 <= selected <= 900:
-
-                result[
-                    nutrient
-                ] = selected
-
+                result[nutrient] = selected
         else:
-
             if 0 <= selected <= 100:
+                result[nutrient] = selected
 
-                result[
-                    nutrient
-                ] = selected
+    # Detect declared serving basis
+    serving_basis = "100g"
+    for r in nutrition_rows:
+        t = str(r.get("text", "")).lower()
+        if "per serving" in t or "serving size" in t:
+            serving_basis = "per serving"
+            break
+        elif "per pack" in t:
+            serving_basis = "per pack"
+            break
+        elif "per 100g" in t or "per 100 g" in t or "per 100ml" in t:
+            serving_basis = "per 100g"
+            break
 
+    result["serving_basis"] = serving_basis
     return result
 
 
@@ -980,7 +980,8 @@ def extract_category(
 # ============================================================
 
 def extract_product_from_text(
-    text
+    text,
+    rows=None
 ):
 
     global _LAST_OCR_DATA
@@ -994,13 +995,14 @@ def extract_product_from_text(
     ]
 
     # --------------------------------------------------------
-    # Use positional OCR rows if available.
+    # Use positional OCR rows if provided or available.
     # --------------------------------------------------------
 
-    rows = _LAST_OCR_DATA.get(
-        "rows",
-        []
-    )
+    if rows is None:
+        rows = _LAST_OCR_DATA.get(
+            "rows",
+            []
+        )
 
     if rows:
 
@@ -1018,6 +1020,7 @@ def extract_product_from_text(
             "protein": 0.0,
             "fibre": 0.0,
             "salt": 0.0,
+            "serving_basis": "100g",
         }
 
     product_name = extract_product_name(
@@ -1075,6 +1078,9 @@ def extract_product_from_text(
         "salt":
             nutrition["salt"],
 
+        "serving_basis":
+            nutrition.get("serving_basis", "100g"),
+
         "source":
             "OCR",
 
@@ -1084,3 +1090,14 @@ def extract_product_from_text(
         "image_url":
             "",
     }
+
+
+def perform_ocr_and_extract(image_path):
+    """
+    Direct OCR processing avoiding reliance on mutable module state.
+    Returns (text, product_dict, rows).
+    """
+    text = perform_ocr(image_path)
+    rows = _LAST_OCR_DATA.get("rows", [])
+    product = extract_product_from_text(text, rows=rows)
+    return text, product, rows

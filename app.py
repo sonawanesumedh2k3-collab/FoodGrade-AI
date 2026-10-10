@@ -7,7 +7,9 @@ from flask import (
     flash,
     session
 )
+from werkzeug.utils import secure_filename
 
+import json
 import sqlite3
 from pathlib import Path
 
@@ -26,10 +28,12 @@ from services.v5_ocr import (
 )
 from services.v6_ml import (
     train_health_model,
+    load_model_metrics,
     predict_health_grade
 )
 from services.v5_recommender import (
-    recommend_similar_products
+    recommend_similar_products,
+    recommend_healthier_alternatives
 )
 
 from services.v7_testing import run_tests
@@ -831,7 +835,7 @@ def new_product():
                     result["claim_grade"],
 
                     "Manual",
-                    100
+                    result.get("data_quality_score", 100)
                 )
             )
 
@@ -890,24 +894,45 @@ def product_detail(product_id):
         (product_id,)
     ).fetchone()
 
-    conn.close()
-
-
     if product is None:
-
+        conn.close()
         flash(
             "Product not found.",
             "danger"
         )
-
         return redirect(
             url_for("products")
         )
 
+    # Load all products for recommendation engine
+    all_rows = conn.execute(
+        "SELECT * FROM products ORDER BY id DESC"
+    ).fetchall()
+    conn.close()
+
+    product_dict = dict(product)
+    all_products = [dict(r) for r in all_rows]
+
+    similar = recommend_similar_products(
+        product_dict, all_products, top_n=5
+    )
+    healthier = recommend_healthier_alternatives(
+        product_dict, all_products, top_n=3
+    )
+
+    foodgrade_result = calculate_foodgrade(product_dict)
+    ml_prediction = predict_health_grade(
+        product_dict,
+        rule_grade=product_dict.get("health_grade")
+    )
 
     return render_template(
         "product_detail.html",
-        product=product
+        product=product,
+        foodgrade=foodgrade_result,
+        ml_prediction=ml_prediction,
+        similar_products=similar,
+        healthier_alternatives=healthier
     )
 
 
@@ -1235,29 +1260,30 @@ def v3_evaluation():
 
 @app.route("/web-retrieval")
 def web_retrieval():
+    crawl_data = session.get("web_crawl")
+    if not crawl_data and session.get("has_crawler_run"):
+        crawl_file = BASE_DIR / "data" / "web" / "crawler_latest.json"
+        if crawl_file.exists():
+            try:
+                raw_items = json.loads(crawl_file.read_text(encoding="utf-8", errors="ignore"))
+                if isinstance(raw_items, dict):
+                    raw_items = [raw_items]
+                crawl_data = {
+                    "count": len(raw_items),
+                    "items": raw_items,
+                    "output": "data/web/crawler_latest.json",
+                    "log": ""
+                }
+            except Exception:
+                crawl_data = None
 
     return render_template(
         "web_retrieval.html",
-
-        product=session.get(
-            "web_product"
-        ),
-
-        analysis=session.get(
-            "web_analysis"
-        ),
-
-        crawl=session.get(
-            "web_crawl"
-        ),
-
-        crawl_analysis=session.get(
-            "web_crawl_analysis"
-        ),
-
-        crawl_selected=session.get(
-            "web_crawl_selected"
-        )
+        product=session.get("web_product"),
+        analysis=session.get("web_analysis"),
+        crawl=crawl_data,
+        crawl_analysis=session.get("web_crawl_analysis"),
+        crawl_selected=session.get("web_crawl_selected")
     )
 
 
@@ -1419,35 +1445,21 @@ def web_crawl():
         )
 
 
-        session["web_crawl"] = result
-
-
-        session.pop(
-            "web_crawl_analysis",
-            None
-        )
-
-
-        session.pop(
-            "web_crawl_selected",
-            None
-        )
-
+        session["has_crawler_run"] = True
+        session.pop("web_crawl", None)
+        session.pop("web_crawl_analysis", None)
+        session.pop("web_crawl_selected", None)
 
         flash(
-            f"Crawler completed: "
-            f"{result['count']} page(s) exported.",
+            f"Crawler completed: {result['count']} page(s) exported.",
             "success"
         )
 
-
     except Exception as exc:
-
         flash(
             f"Crawler failed: {exc}",
             "danger"
         )
-
 
     return redirect(
         url_for("web_retrieval")
@@ -1464,39 +1476,36 @@ def web_crawl():
 )
 def web_crawl_analyze(item_index):
 
-    crawl = session.get(
-        "web_crawl"
-    )
+    crawl_file = BASE_DIR / "data" / "web" / "crawler_latest.json"
+    items = []
+    if crawl_file.exists():
+        try:
+            raw = json.loads(crawl_file.read_text(encoding="utf-8", errors="ignore"))
+            items = raw if isinstance(raw, list) else [raw]
+        except Exception:
+            items = []
 
+    if not items:
+        crawl = session.get("web_crawl") or {}
+        items = crawl.get("items", [])
 
-    if not crawl:
-
+    if not items:
         flash(
             "Run the crawler first.",
             "warning"
         )
-
         return redirect(
             url_for("web_retrieval")
         )
-
-
-    items = crawl.get(
-        "items",
-        []
-    )
-
 
     if (
         item_index < 0
         or item_index >= len(items)
     ):
-
         flash(
             "Crawler result not found.",
             "danger"
         )
-
         return redirect(
             url_for("web_retrieval")
         )
@@ -1744,6 +1753,19 @@ def v5_ocr():
             url_for("v5_page")
         )
 
+    # Validate file size (max 10 MB)
+    uploaded_file.seek(0, 2)
+    file_size = uploaded_file.tell()
+    uploaded_file.seek(0)
+    if file_size > 10 * 1024 * 1024:
+        flash(
+            "Image file too large. Maximum allowed size is 10 MB.",
+            "danger"
+        )
+        return redirect(
+            url_for("v5_page")
+        )
+
 
     try:
 
@@ -1950,7 +1972,7 @@ def v5_ocr():
 
                 "",
 
-                0
+                result.get("data_quality_score", 0)
             )
         )
 
@@ -2031,8 +2053,9 @@ def v6_page():
 
     try:
 
-        # Automatically train the model when V6 opens.
-        ml_result = train_health_model()
+        # Load cached metrics — no training on page load.
+        # User must click "Train Model" to retrain.
+        ml_result = load_model_metrics()
 
         return render_template(
             "v6_ml.html",

@@ -1,86 +1,137 @@
-# FoodGrade AI - Main Development Project
+# FoodGrade AI: Intelligent Food Product Quality Assessment System
 
-This is the single, continuing FoodGrade AI project. It is based on the working V2.5.1 build and is intended to be extended step-by-step instead of creating a new Python environment for every version.
+FoodGrade AI is an academic research prototype and information-retrieval system that evaluates packaged food products through two independent, transparent evaluations:
 
-## Current baseline
+1. **Health Grade (A–E):** Assesses the nutritional profile of a product using a transparent 6-dimension scoring model (Total Sugar 20%, Saturated Fat 20%, Sodium 20%, Energy 10%, Dietary Fibre 15%, Protein 15%).
+2. **Claim Accuracy Grade (A–E):** Evaluates marketing and nutritional claims against statutory FSSAI (Food Safety and Standards Authority of India) Advertising and Claims Regulations (2018).
 
-- Flask web application
-- SQLite local database
-- Manual product entry/search
-- Product dashboard and product details
-- Open Food Facts import with retry handling
-- Raw/processed data folders
-- Data Center
-- FoodGrade research methodology page
-- Prototype Claim Grade A-E
-- Prototype Health Grade A-E
-- Requirements file
+These assessments remain unmerged: a product can have accurate claims without being nutritionally healthy, or be healthy without making marketing claims.
 
-## One environment for the whole project
+---
 
-Create **one** virtual environment in this folder:
+## 1. System Architecture & Development Stages
 
-```text
-FoodGrade_AI_Main/
-└── .venv/
-```
+- **V1–V2: Application Core & Data Collection:**
+  - Flask web application, dashboard, and SQLite catalog.
+  - Manual product entry and Open Food Facts Indian dataset integration.
+  - Transparent data completeness indicators and missing data handling.
 
-Do not create a new `.venv` for each future FoodGrade stage. We will continue adding features to this project.
+- **V3: Information Extraction, NLP, and Ranking:**
+  - Extraction of food claims, ingredients, and nutritional entities.
+  - Parentheses-aware compound ingredient parsing preserving sub-ingredients.
+  - Text normalization, ingredient category classification, and relevance ranking.
+  - Direct integration into the FoodGrade V2.5 grading engine.
 
-## First-time setup (recommended)
+- **V4: Web Retrieval & Crawling:**
+  - Single product URL fetching with Schema.org / JSON-LD parsing.
+  - Controlled Scrapy crawling obeying `robots.txt` and domain boundaries.
+  - **Security Hardening:** Server-Side Request Forgery (SSRF) defense prohibiting access to loopback, private RFC1918, link-local, and cloud metadata endpoints.
+  - **Cookie Protection:** Server-side persistence of crawl outputs in `data/web/` preventing client-side cookie overflow.
 
-On Windows, double-click:
+- **V5: OCR & Recommendation Engine:**
+  - Optical Character Recognition (OCR) using Pillow and Tesseract.
+  - Image preprocessing with camera EXIF rotation correction and contrast optimization.
+  - Structured extraction of nutrition tables, ingredients, and claims.
+  - Hybrid content-based recommendations: TF-IDF lexical profile + category matching + nutritional distance.
+  - Healthier alternatives recommendation with transparent, granular reasons (e.g., `-8.5g sugar`, `+4.2g fibre`).
 
-```text
-setup.bat
-```
+- **V6: Machine Learning (Random Forest Surrogate):**
+  - Supervised Random Forest classifier trained on real empirical Indian food records (SQLite DB + Open Food Facts) and reference prototype anchors.
+  - Stratified train/test split, 5-fold cross-validation, feature importance, and confusion matrix.
+  - Model and metrics persistence via Joblib and JSON disk caching (no retraining on page reload).
+  - Explicit surrogate comparison: explains whether ML prediction agrees or diverges from the deterministic 6-dimension score.
 
-It creates `.venv` once and installs the packages from `requirements.txt`.
+- **V7: Interactive System Diagnostics & Testing:**
+  - Automated test runner verifying database connectivity, NLP pipelines, web parsers, OCR engines, recommender, and ML models.
 
-Or use PyCharm:
+- **V8: Project Overview & Academic Documentation:**
+  - Comprehensive problem statement, objectives, architecture, workflow, and research limitations.
 
-1. Open the `FoodGrade_AI_Main` folder.
-2. Let PyCharm detect/use `.venv` if it already exists.
-3. Set the interpreter to:
-   `FoodGrade_AI_Main\.venv\Scripts\python.exe`
-4. Do **not** create another environment for future FoodGrade stages.
+---
 
-## Start the project
+## 2. Environment Setup
 
-After the first setup, double-click:
+### Requirements
+- Windows 10/11
+- Python 3.12 or 3.13
+- Tesseract OCR (installed at `C:\Program Files\Tesseract-OCR\tesseract.exe`)
 
-```text
-start.bat
-```
-
-Or in PyCharm run:
-
+### Virtual Environment Setup
+Ensure the existing virtual environment `.venv` is activated:
 ```powershell
-python app.py
+# In PowerShell:
+.venv\Scripts\Activate.ps1
+
+# Or run directly using the environment's python:
+.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-Then open:
+---
 
+## 3. Launching the Application
+
+### Option A: PowerShell / Command Line
+```powershell
+& .venv\Scripts\python.exe app.py
+```
+Open your browser and navigate to:
 ```text
 http://127.0.0.1:5000
 ```
 
-## Future development plan
+### Option B: Batch Scripts
+Double-click `start.bat` from Windows Explorer.
 
-We will continue this same project folder:
+---
 
-- V3.1 - Information Extraction
-- V3.2 - Language Model / NLP processing
-- V3.3 - Claim and ingredient ranking
-- V3.4 - Connect NLP to FoodGrade assessment
-- V4 - Web retrieval / crawling
-- V5 - OCR and content-based recommendation
-- V6 - ML training and evaluation
-- V7 - Testing and refinement
-- V8 - Documentation, PPT and final packaging
+## 4. Running the Automated Test Suite
 
-These stages are development milestones, not separate installations.
+All tests can be executed using `pytest` inside the virtual environment:
 
-## Important
+```powershell
+# Run the master comprehensive test suite:
+& .venv\Scripts\python.exe -m pytest test_foodgrade_suite.py -v
 
-The current A-E grading implementation is still a research/prototype implementation based on the documented FoodGrade methodology. It will be refined and evaluated as later stages are developed.
+# Run all test suites including baseline tests:
+& .venv\Scripts\python.exe -m pytest tests_phase1.py test_foodgrade_suite.py -v
+```
+
+All 27 automated tests and 28 subtests run in isolation without modifying the primary database.
+
+---
+
+## 5. Scoring & Claim Verification Methodology
+
+### Health Score Weights (0–100)
+| Dimension | Weight | Target Direction | FSSAI Reference Standard |
+|---|---:|---|---|
+| Total Sugar | 20% | Lower is better | &le; 5g/100g low sugar; &gt; 22.5g high penalty |
+| Saturated Fat | 20% | Lower is better | &le; 1.5g/100g low sat fat; &gt; 10g penalty |
+| Sodium / Salt | 20% | Lower is better | &le; 0.3g/100g low sodium; &gt; 1.5g penalty |
+| Energy (Calories) | 10% | Lower is preferable | Baseline 150 kcal/100g |
+| Dietary Fibre | 15% | Higher is better | &ge; 3g source; &ge; 6g high fibre bonus |
+| Protein | 15% | Higher is better | &ge; 5g source; &ge; 10g high protein bonus |
+
+### Health Grade Thresholds
+- **A:** 85.0 – 100.0
+- **B:** 70.0 – 84.99
+- **C:** 55.0 – 69.99
+- **D:** 40.0 – 54.99
+- **E:** 0.0 – 39.99
+
+### Missing Data Policy
+Missing or undeclared nutritional fields are **not silently converted to zero**. Incomplete labels receive a neutral reference score (50.0/100) for unmeasured dimensions, and the data completeness score is penalized accordingly.
+
+### Claim States
+- `VERIFIED`: The product data fully satisfies applicable statutory FSSAI limits.
+- `NOT_VERIFIED`: Product data contradicts or fails statutory FSSAI limits.
+- `INSUFFICIENT_EVIDENCE`: A claim was made, but the corresponding nutrient was undeclared.
+- `NO_CLAIMS_DETECTED`: No marketing or nutritional claims detected on the label.
+
+---
+
+## 6. Research Disclaimers & Known Limitations
+
+1. **Academic Research Prototype:** FoodGrade AI is developed for academic demonstration and research. It does not constitute clinical, dietary, or medical advice.
+2. **Surrogate ML Model:** The Random Forest model in V6 serves as an algorithmic surrogate trained to approximate the deterministic 6-dimension rules; it is not independently trained on human health outcomes.
+3. **Data Completeness:** Product evaluations rely on declared package labels and Open Food Facts crowd-sourced entries, which may contain omissions or reporting variations.

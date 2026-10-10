@@ -25,6 +25,17 @@ def run_crawler(start_url, max_pages=10, delay=1.0):
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise ValueError("Please enter a valid start URL.")
 
+    hostname = (parsed.hostname or "").lower()
+    if "openfoodfacts.org" in hostname:
+        raise ValueError(
+            "Crawling Open Food Facts with Scrapy is disabled to respect site terms and rate limits. "
+            "Please use the permitted Data Center / Open Food Facts API import feature instead."
+        )
+
+    # Basic SSRF prevention on crawler start URL
+    if hostname in {"localhost", "127.0.0.1", "0.0.0.0", "::1"} or "metadata" in hostname:
+        raise ValueError("Crawling localhost or internal metadata targets is prohibited (SSRF protection).")
+
     max_pages = max(1, min(int(max_pages), 50))
     delay = max(0.0, min(float(delay), 10.0))
 
