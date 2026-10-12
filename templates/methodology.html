@@ -1,40 +1,131 @@
 {% extends "base.html" %}
-{% block title %}Methodology - FoodGrade AI{% endblock %}
+
+{% block title %}Methodology — FoodGrade AI{% endblock %}
+
+{% block page_class %}theme-products{% endblock %}
+
 {% block content %}
-<div class="mb-4">
-  <h1 class="h3">FoodGrade AI V2.5 Methodology</h1>
-  <p class="text-muted">This version freezes the research methodology before NLP, web crawling, OCR, recommendation and ML are added.</p>
+<div class="container py-4">
+
+    <!-- PAGE HEADER -->
+    <div class="fg-page-header">
+        <div>
+            <div class="fg-theme-badge mb-2">
+                <i class="bi bi-journal-check"></i> Scoring Architecture
+            </div>
+            <h1>FoodGrade AI Scoring Methodology</h1>
+            <p>Mathematical definitions of the 6-dimension health evaluation and FSSAI statutory claim verification.</p>
+        </div>
+        <div>
+            <a class="btn btn-outline-dark" href="{{ url_for('data_center') }}">
+                <i class="bi bi-arrow-left me-1"></i> Data Center
+            </a>
+        </div>
+    </div>
+
+    <!-- DISCLAIMER ALERT -->
+    <div class="alert alert-light border mb-4 d-flex align-items-center gap-2">
+        <i class="bi bi-info-circle-fill text-muted fs-5"></i>
+        <div>
+            <strong>Research Prototype Note:</strong> The A–E health grade is an objective research score based on FSSAI dietary thresholds, not an official medical endorsement or commercial certification.
+        </div>
+    </div>
+
+    <!-- CARDS: DUAL ASSESSMENTS & WEIGHTS -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-6">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header fw-bold">
+                    <i class="bi bi-shield-split me-1 text-muted"></i> Two Separate Assessments
+                </div>
+                <div class="card-body p-4">
+                    <ul class="mb-3">
+                        <li class="mb-2">
+                            <strong>Claim Grade (A–E):</strong> Checks whether detected marketing claims (e.g. "High Protein", "Low Sugar") are legally supported by label nutrition data under FSSAI Advertising and Claims Regulations (2018).
+                        </li>
+                        <li>
+                            <strong>Health Grade (A–E):</strong> Evaluates overall nutritional balance using the transparent 6-dimension benchmark.
+                        </li>
+                    </ul>
+                    <div class="alert alert-light border small text-muted mb-0">
+                        <i class="bi bi-lightbulb me-1 text-warning"></i>
+                        A product can make a 100% accurate claim without being healthy (e.g., zero sugar in a high-saturated-fat snack). The grades intentionally remain unmerged.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header fw-bold">
+                    <i class="bi bi-pie-chart-fill me-1 text-muted"></i> 6-Dimension Health Model Weights
+                </div>
+                <div class="card-body p-4">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Nutritional Dimension</th>
+                                <th>Weight</th>
+                                <th>Target Direction</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Total Sugar</td><td><strong>20%</strong></td><td><span class="badge bg-light text-dark border">Lower is better</span></td></tr>
+                            <tr><td>Saturated Fat</td><td><strong>20%</strong></td><td><span class="badge bg-light text-dark border">Lower is better</span></td></tr>
+                            <tr><td>Sodium / Salt</td><td><strong>20%</strong></td><td><span class="badge bg-light text-dark border">Lower is better</span></td></tr>
+                            <tr><td>Energy (Calories)</td><td><strong>10%</strong></td><td><span class="badge bg-light text-dark border">Lower is preferable</span></td></tr>
+                            <tr><td>Dietary Fibre</td><td><strong>15%</strong></td><td><span class="badge bg-light text-dark border">Higher is better</span></td></tr>
+                            <tr><td>Protein</td><td><strong>15%</strong></td><td><span class="badge bg-light text-dark border">Higher is better</span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CLAIM VERIFICATION TABLE -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header fw-bold">
+            <i class="bi bi-file-earmark-check me-1 text-muted"></i> FSSAI Statutory Claim Verification Criteria
+        </div>
+        <div class="card-body p-4">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Claim Type</th>
+                            <th>FSSAI Statutory Standard (2018)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Low Sugar</strong></td><td>&le; 5 g / 100 g for solids, or &le; 2.5 g / 100 ml for liquids</td></tr>
+                        <tr><td><strong>High Protein</strong></td><td>&ge; 20% of RDA per 100 g (solids), &ge; 10% per 100 ml (liquids), or &ge; 10% per 100 kcal</td></tr>
+                        <tr><td><strong>High Fibre</strong></td><td>&ge; 6 g per 100 g, or &ge; 3 g per 100 kcal</td></tr>
+                        <tr><td><strong>Low Sodium</strong></td><td>&le; 0.12 g sodium per 100 g or 100 ml</td></tr>
+                        <tr><td><strong>Low Saturated Fat</strong></td><td>&le; 1.5 g per 100 g (solids) or &le; 0.75 g per 100 ml (liquids), subject to total trans-fat ceiling</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="small text-muted mt-3 mb-0">
+                These statutory criteria are established by FSSAI; evaluating compliance does not supersede general medical nutritional advice.
+            </p>
+        </div>
+    </div>
+
+    <!-- DATASET LABELING -->
+    <div class="card shadow-sm">
+        <div class="card-header fw-bold">
+            <i class="bi bi-tags-fill me-1 text-muted"></i> Dataset Attributes & Transparency
+        </div>
+        <div class="card-body p-4">
+            <p class="text-muted">
+                Every record preserves the original source, normalized nutrition attributes, detected marketing claims, verification evidence, and data completeness indicators.
+            </p>
+            <a class="btn btn-primary" href="{{ url_for('data_center') }}">
+                <i class="bi bi-database me-1"></i> Go to Data Center
+            </a>
+        </div>
+    </div>
+
 </div>
-<div class="alert alert-warning"><strong>Research prototype:</strong> The A–E health grade is a FoodGrade research label, not an official FSSAI rating or medical recommendation.</div>
-<div class="row g-4">
-  <div class="col-lg-6">
-    <div class="card h-100"><div class="card-body p-4">
-      <h2 class="h5">Two separate grades</h2>
-      <ul><li><strong>Claim Grade:</strong> checks whether detected product claims are supported by available label data and applicable FSSAI claim criteria.</li><li><strong>Health Grade:</strong> evaluates the nutrition profile separately.</li></ul>
-      <p class="mb-0">An accurate claim does not automatically mean the whole product is healthy.</p>
-    </div></div>
-  </div>
-  <div class="col-lg-6">
-    <div class="card h-100"><div class="card-body p-4">
-      <h2 class="h5">Health model weights</h2>
-      <table class="table table-sm"><tbody><tr><td>Sugar</td><td>20%</td></tr><tr><td>Saturated fat</td><td>20%</td></tr><tr><td>Sodium / salt</td><td>20%</td></tr><tr><td>Energy</td><td>10%</td></tr><tr><td>Fibre</td><td>15%</td></tr><tr><td>Protein</td><td>15%</td></tr></tbody></table>
-    </div></div>
-  </div>
-</div>
-<div class="card mt-4"><div class="card-body p-4">
-<h2 class="h5">Claim verification examples</h2>
-<div class="table-responsive"><table class="table table-bordered align-middle"><thead><tr><th>Claim</th><th>Research reference</th></tr></thead><tbody>
-<tr><td>Low sugar</td><td>≤ 5 g/100 g for solids or ≤ 2.5 g/100 ml for liquids</td></tr>
-<tr><td>High protein</td><td>20% of RDA/100 g for solids; 10%/100 ml for liquids; or 10%/100 kcal</td></tr>
-<tr><td>High fibre</td><td>≥ 6 g/100 g or ≥ 3 g/100 kcal</td></tr>
-<tr><td>Low sodium</td><td>≤ 0.12 g sodium/100 g or 100 ml</td></tr>
-<tr><td>Low saturated fat</td><td>≤ 1.5 g/100 g solids or ≤ 0.75 g/100 ml liquids, subject to FSSAI's additional condition</td></tr>
-</tbody></table></div>
-<p class="small text-muted mb-0">These are claim-use criteria from FSSAI; they are not themselves a universal definition of a healthy food.</p>
-</div></div>
-<div class="card mt-4"><div class="card-body p-4">
-<h2 class="h5">Dataset labeling</h2>
-<p>Every product should keep the original source, normalized nutrition values, detected claim, claim status, evidence/reason, claim grade, health grade and data-quality information.</p>
-<a class="btn btn-dark" href="{{ url_for('data_center') }}">Back to Data Center</a>
-</div></div>
 {% endblock %}

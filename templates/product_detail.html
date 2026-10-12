@@ -1,25 +1,39 @@
 {% extends "base.html" %}
 {% block title %}{{ product['product_name'] }} - FoodGrade AI{% endblock %}
 
+{% block page_class %}theme-products{% endblock %}
+
 {% block content %}
 
 {# ── Top Header ── #}
-<div class="d-flex justify-content-between align-items-start mb-4">
-  <div>
-    <h1 class="h3 mb-1 fw-bold text-dark">{{ product['product_name'] }}</h1>
-    <p class="text-muted mb-0">
-      <span class="badge bg-light text-dark border me-1">{{ product['brand'] or 'Unbranded' }}</span>
-      <span class="badge bg-light text-dark border me-1">{{ product['category'] or 'Packaged Food' }}</span>
-      {% if product['barcode'] %}
-        <span class="text-secondary small">Barcode: <code>{{ product['barcode'] }}</code></span>
-      {% endif %}
-    </p>
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+  <div class="d-flex align-items-center gap-3">
+    {% if product['image_url'] %}
+      <div class="bg-white p-2 rounded border shadow-sm d-flex align-items-center justify-content-center"
+           style="width: 80px; height: 80px;">
+        <img src="{{ product['image_url'] }}" alt="{{ product['product_name'] }}"
+             style="max-width: 100%; max-height: 100%; object-fit: contain;"
+             loading="lazy"
+             onerror="this.onerror=null; this.parentElement.style.display='none';">
+      </div>
+    {% endif %}
+    <div>
+      <h1 class="h3 mb-1 fw-bold text-dark">{{ product['product_name'] }}</h1>
+      <p class="text-muted mb-0">
+        <span class="badge bg-light text-dark border me-1">{{ product['brand'] or 'Unbranded' }}</span>
+        <span class="badge bg-light text-dark border me-1">{{ product['category'] or 'Packaged Food' }}</span>
+        {% if product['barcode'] %}
+          <span class="text-secondary small">Barcode: <code>{{ product['barcode'] }}</code></span>
+        {% endif %}
+      </p>
+    </div>
   </div>
   <div class="d-flex gap-2">
     <a class="btn btn-outline-dark" href="{{ url_for('products') }}">← Back to Catalog</a>
     <a class="btn btn-primary" href="{{ url_for('v3_analyze', product_id=product['id']) }}">Analyze with V3.1</a>
   </div>
 </div>
+
 
 {# ── Missing Data / Completeness Warning ── #}
 {% if foodgrade and foodgrade.missing_fields %}

@@ -1,6 +1,122 @@
-{% extends "base.html" %}{% block title %}Data Center - FoodGrade AI{% endblock %}{% block content %}
-<div class="mb-4"><h1 class="h3">Data Center</h1><p class="text-muted">V2's main job is to turn external Indian food-product data into a clean local FoodGrade dataset.</p></div>
-<div class="row g-3 mb-4"><div class="col-md-4"><div class="card stat-card"><div class="card-body"><div class="text-muted">All local products</div><div class="display-6 fw-bold">{{ total }}</div></div></div></div><div class="col-md-4"><div class="card stat-card"><div class="card-body"><div class="text-muted">Open Food Facts</div><div class="display-6 fw-bold">{{ off_count }}</div></div></div></div><div class="col-md-4"><div class="card stat-card"><div class="card-body"><div class="text-muted">Manual</div><div class="display-6 fw-bold">{{ manual_count }}</div></div></div></div></div>
-<div class="card mb-4"><div class="card-body p-4"><h2 class="h5">Import Indian products</h2><p>Fetch a small sample associated with India from Open Food Facts, normalize the fields, save the raw response locally, save a cleaned CSV, and import the products into SQLite.</p><form method="post" action="{{ url_for('import_indian_products') }}" class="row g-3 align-items-end"><div class="col-md-4"><label class="form-label">Number of products</label><select class="form-select" name="limit"><option value="10">10</option><option value="25" selected>25</option><option value="50">50</option><option value="100">100</option></select></div><div class="col-md-4"><button class="btn btn-dark">Fetch & Clean Data</button></div></form><div class="alert alert-warning mt-4 mb-0"><strong>Responsible API use:</strong> V2 intentionally retrieves a small page rather than bulk-downloading the database. Open Food Facts asks API clients to identify themselves with a User-Agent and to limit returned fields.</div></div></div>
-<div class="card"><div class="card-body p-4"><h2 class="h5">What V2 creates</h2><ul class="mb-0"><li><code>data/raw/</code> — raw API JSON snapshots</li><li><code>data/processed/foodgrade_india_latest.csv</code> — cleaned dataset</li><li>SQLite records — products ready for later analysis</li><li>Data-quality score — simple completeness indicator for each imported product</li></ul>{% if latest_exists %}<div class="alert alert-success mt-3 mb-0">A cleaned FoodGrade dataset has already been generated.</div>{% endif %}</div></div>
+{% extends "base.html" %}
+
+{% block title %}Data Center — FoodGrade AI{% endblock %}
+
+{% block page_class %}theme-products{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <!-- PAGE HEADER -->
+    <div class="fg-page-header">
+        <div>
+            <div class="fg-theme-badge mb-2">
+                <i class="bi bi-database-fill"></i> Data Pipeline
+            </div>
+            <h1>Data Center & Ingestion</h1>
+            <p>Import and normalize packaged food products from Open Food Facts India into the local database.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-dark" href="{{ url_for('products') }}">
+                <i class="bi bi-basket2 me-1"></i> View Catalog
+            </a>
+            <a class="btn btn-outline-dark" href="{{ url_for('methodology') }}">
+                <i class="bi bi-journal-text me-1"></i> Methodology
+            </a>
+        </div>
+    </div>
+
+    <!-- STAT METRIC CARDS -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card stat-card stat-card-accent">
+                <div class="card-body">
+                    <div class="text-muted small fw-bold text-uppercase">Local Catalog Total</div>
+                    <div class="display-6 fw-bold text-dark mt-1">{{ total }}</div>
+                    <small class="text-muted">Total packaged food records stored</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card stat-card stat-card-accent">
+                <div class="card-body">
+                    <div class="text-muted small fw-bold text-uppercase">Open Food Facts</div>
+                    <div class="display-6 fw-bold text-dark mt-1">{{ off_count }}</div>
+                    <small class="text-muted">Imported from Indian food database</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card stat-card stat-card-accent">
+                <div class="card-body">
+                    <div class="text-muted small fw-bold text-uppercase">Manual & OCR Entries</div>
+                    <div class="display-6 fw-bold text-dark mt-1">{{ manual_count }}</div>
+                    <small class="text-muted">Manually submitted or scanned products</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- IMPORT PANEL -->
+    <div class="card mb-4">
+        <div class="card-header fw-bold">
+            <i class="bi bi-cloud-arrow-down me-1"></i> Import Indian Food Records
+        </div>
+        <div class="card-body p-4">
+            <p class="text-muted">
+                Fetch a curated sample associated with India from Open Food Facts, normalize nutritional entities, generate a processed CSV dataset, and save cleaned records to SQLite with data quality completeness scoring.
+            </p>
+
+            <form method="post" action="{{ url_for('import_indian_products') }}" class="row g-3 align-items-end mt-1">
+                <div class="col-md-4">
+                    <label class="form-label">Number of Products to Retrieve</label>
+                    <select class="form-select" name="limit">
+                        <option value="10">10 products (quick sample)</option>
+                        <option value="25" selected>25 products (recommended)</option>
+                        <option value="50">50 products</option>
+                        <option value="100">100 products</option>
+                    </select>
+                </div>
+
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-download me-1"></i> Fetch & Clean Data
+                    </button>
+                </div>
+            </form>
+
+            <div class="alert alert-light border mt-4 mb-0 small text-muted d-flex align-items-center gap-2">
+                <i class="bi bi-shield-check text-success fs-5"></i>
+                <div>
+                    <strong>Responsible API Usage:</strong> FoodGrade AI specifies an explicit User-Agent, limits payload attributes, and respects rate limits to adhere to Open Food Facts guidelines.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ARTIFACTS CARD -->
+    <div class="card">
+        <div class="card-header fw-bold">
+            <i class="bi bi-folder-check me-1"></i> Data Pipeline Outputs
+        </div>
+        <div class="card-body p-4">
+            <ul class="mb-0 text-muted">
+                <li><code class="text-dark">data/raw/</code> — Raw JSON snapshots from Open Food Facts API</li>
+                <li><code class="text-dark">data/processed/foodgrade_india_latest.csv</code> — Cleaned, normalized Indian food records</li>
+                <li><code class="text-dark">SQLite database</code> — Verified products ready for grading, NLP entity ranking, and ML</li>
+                <li><code class="text-dark">Data Completeness Score</code> — Per-product indicator of label transparency</li>
+            </ul>
+
+            {% if latest_exists %}
+                <div class="alert alert-success mt-3 mb-0 small d-flex align-items-center gap-2">
+                    <i class="bi bi-check-circle-fill"></i>
+                    <div>A cleaned FoodGrade India dataset is active and cached.</div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
 {% endblock %}

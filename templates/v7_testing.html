@@ -1,185 +1,119 @@
 {% extends "base.html" %}
 
+{% block title %}System Validation — FoodGrade AI{% endblock %}
+
+{% block page_class %}theme-validation{% endblock %}
+
 {% block content %}
 
 <div class="container py-4">
 
-    <h2>V7 — Testing & Validation</h2>
-
-    <p class="text-muted">
-        Functional validation of the major FoodGrade AI
-        system components.
-    </p>
-
-
-    <!-- SUMMARY -->
-
-    <div class="row mb-4">
-
-        <div class="col-md-4">
-
-            <div class="card text-center">
-
-                <div class="card-body">
-
-                    <h2>
-                        {{ results.total }}
-                    </h2>
-
-                    <p class="mb-0">
-                        Total Tests
-                    </p>
-
-                </div>
-
+    <!-- PAGE HEADER -->
+    <div class="fg-page-header">
+        <div>
+            <div class="fg-theme-badge mb-2">
+                <i class="bi bi-shield-check"></i> System Diagnostics
             </div>
+            <h1>System Validation & Component Health</h1>
+            <p>Automated diagnostic verification across database, NLP, web retrieval, OCR, and ML models.</p>
+        </div>
+        <div>
+            <span class="badge bg-light text-dark border p-2">
+                <i class="bi bi-check-all text-success me-1"></i> Live Health Check
+            </span>
+        </div>
+    </div>
 
+    <!-- SUMMARY METRIC CARDS -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card stat-card stat-card-accent">
+                <div class="card-body">
+                    <div class="text-muted small fw-bold text-uppercase">Diagnostic Checks</div>
+                    <div class="display-6 fw-bold text-dark mt-1">{{ results.total }}</div>
+                    <small class="text-muted">End-to-end integration points</small>
+                </div>
+            </div>
         </div>
 
-
         <div class="col-md-4">
-
-            <div class="card text-center">
-
+            <div class="card stat-card stat-card-accent">
                 <div class="card-body">
-
-                    <h2 class="text-success">
-                        {{ results.passed }}
-                    </h2>
-
-                    <p class="mb-0">
-                        Passed
-                    </p>
-
+                    <div class="text-muted small fw-bold text-uppercase">Passed Checks</div>
+                    <div class="display-6 fw-bold text-success mt-1">{{ results.passed }}</div>
+                    <small class="text-muted">Components functioning nominally</small>
                 </div>
-
             </div>
-
         </div>
 
-
         <div class="col-md-4">
-
-            <div class="card text-center">
-
+            <div class="card stat-card stat-card-accent">
                 <div class="card-body">
-
-                    <h2 class="text-danger">
+                    <div class="text-muted small fw-bold text-uppercase">Failed Checks</div>
+                    <div class="display-6 fw-bold {% if results.failed > 0 %}text-danger{% else %}text-muted{% endif %} mt-1">
                         {{ results.failed }}
-                    </h2>
-
-                    <p class="mb-0">
-                        Failed
-                    </p>
-
+                    </div>
+                    <small class="text-muted">Components requiring review</small>
                 </div>
-
             </div>
-
         </div>
-
     </div>
 
-
-    <!-- TEST TABLE -->
-
-    <div class="card">
-
-        <div class="card-header">
-
-            <strong>
-                System Test Results
-            </strong>
-
+    <!-- TEST TABLE CARD -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>
+                <i class="bi bi-clipboard2-pulse me-1 text-muted"></i> Component Diagnostic Matrix
+            </span>
+            <span class="badge bg-light text-dark border">
+                {{ results.passed }} / {{ results.total }} Passing
+            </span>
         </div>
 
-        <div class="card-body">
-
-            <table class="table table-bordered">
-
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
                 <thead>
-
                     <tr>
-
-                        <th>
-                            #
-                        </th>
-
-                        <th>
-                            Component
-                        </th>
-
-                        <th>
-                            Status
-                        </th>
-
-                        <th>
-                            Details
-                        </th>
-
+                        <th style="width: 50px;">#</th>
+                        <th style="min-width: 200px;">Subsystem Component</th>
+                        <th style="width: 130px;">Status</th>
+                        <th>Diagnostic Details</th>
                     </tr>
-
                 </thead>
-
                 <tbody>
-
                     {% for test in results.tests %}
-
                     <tr>
-
+                        <td class="text-muted">{{ loop.index }}</td>
                         <td>
-                            {{ loop.index }}
+                            <strong>{{ test.name }}</strong>
                         </td>
-
                         <td>
-                            <strong>
-                                {{ test.name }}
-                            </strong>
-                        </td>
-
-                        <td>
-
                             {% if test.status == "PASS" %}
-
-                            <span class="badge bg-success">
-                                PASS
+                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                                <i class="bi bi-check-circle-fill me-1"></i> PASS
                             </span>
-
                             {% else %}
-
-                            <span class="badge bg-danger">
-                                FAIL
+                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">
+                                <i class="bi bi-x-circle-fill me-1"></i> FAIL
                             </span>
-
                             {% endif %}
-
                         </td>
-
                         <td>
-                            {{ test.details }}
+                            <code class="text-secondary small">{{ test.details }}</code>
                         </td>
-
                     </tr>
-
                     {% endfor %}
-
                 </tbody>
-
             </table>
-
         </div>
-
     </div>
 
-
-    <div class="alert alert-info mt-4">
-
-        <strong>Testing Scope:</strong>
-
-        Database connectivity, information extraction,
-        NLP, web retrieval, OCR, recommendation and
-        machine-learning components were checked.
-
+    <!-- SCOPE ALERT -->
+    <div class="alert alert-light border small text-muted d-flex align-items-center gap-2">
+        <i class="bi bi-info-circle text-primary fs-5"></i>
+        <div>
+            <strong>Validation Scope:</strong> Validates database connection pools, NLP entity parsers, SSRF security guards, PaddleOCR/Tesseract fallbacks, TF-IDF content similarity matrices, and Random Forest surrogate model caches.
+        </div>
     </div>
 
 </div>

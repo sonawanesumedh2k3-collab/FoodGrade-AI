@@ -4,25 +4,27 @@
 V5 OCR & Recommendations - FoodGrade AI
 {% endblock %}
 
+{% block page_class %}theme-scanner{% endblock %}
+
 {% block content %}
 
-<div class="mb-4">
+<div class="container py-4">
 
-    <span class="badge text-bg-primary">
-        V5 · OCR + Content-Based Recommendation
-    </span>
-
-    <h1 class="h3 mt-2">
-        OCR & Product Recommendation
-    </h1>
-
-    <p class="text-muted">
-        Upload a food-label image, extract product information
-        using OCR, analyze it through V3 and FoodGrade, and
-        find similar products using content-based similarity.
-    </p>
-
-</div>
+    <!-- PAGE HEADER -->
+    <div class="fg-page-header">
+        <div>
+            <div class="fg-theme-badge mb-2">
+                <i class="bi bi-upc-scan"></i> Label Scanner & OCR
+            </div>
+            <h1>Nutrition Label Scanner & Recommendations</h1>
+            <p>Upload a food product label image for high-accuracy OCR extraction, ingredient analysis, and healthy alternatives.</p>
+        </div>
+        <div>
+            <span class="badge bg-light text-dark border p-2">
+                <i class="bi bi-cpu text-success me-1"></i> PaddleOCR / PaddleX
+            </span>
+        </div>
+    </div>
 
 
 <!-- ========================================================= -->
@@ -56,6 +58,10 @@ V5 OCR & Recommendations - FoodGrade AI
                     accept=".png,.jpg,.jpeg,.webp"
                     required
                 >
+                <div class="form-text">
+                    Supported formats: PNG, JPG, JPEG, WEBP. Maximum file size: 10 MB.
+                    Powered by standalone OCR service (port 8001) with local fallback.
+                </div>
 
             </div>
 
@@ -103,6 +109,30 @@ V5 OCR & Recommendations - FoodGrade AI
 
 {% if ocr_product %}
 
+{% if name_needs_review %}
+<div class="alert alert-warning border-0 mb-4" role="alert">
+    <div class="d-flex align-items-start gap-3">
+        <span style="font-size:1.5rem;">⚠️</span>
+        <div class="flex-grow-1">
+            <strong>Product name could not be reliably identified.</strong>
+            <p class="mb-2 mt-1 small text-muted">
+                The OCR could not extract a confident product name from this label.
+                Please type the correct product name below and click <strong>Save with Corrected Name</strong>.
+                Nutrition values have been extracted correctly.
+            </p>
+            <form method="POST" action="{{ url_for('v5_ocr_save_corrected') }}" class="d-flex gap-2 align-items-center flex-wrap">
+                <input type="hidden" name="ocr_product_json" value="{{ ocr_product | tojson | forceescape }}">
+                <input type="text" name="corrected_name" class="form-control form-control-sm" style="max-width:320px;"
+                       placeholder="e.g. Classic Salted Potato Chips" required
+                       value="{{ ocr_product.get('product_name', '') }}">
+                <button type="submit" class="btn btn-sm btn-warning fw-semibold">💾 Save with Corrected Name</button>
+                <a href="{{ url_for('v5_page') }}" class="btn btn-sm btn-outline-secondary">Discard</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="card mb-4">
 
     <div class="card-header fw-bold">
@@ -138,8 +168,54 @@ V5 OCR & Recommendations - FoodGrade AI
                     </tr>
 
                     <tr>
-                        <th>Ingredients</th>
+                        <th>Category</th>
                         <td>
+                            {{ ocr_product.get(
+                                "category",
+                                "—"
+                            ) or "—" }}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th>Serving Size</th>
+                        <td>
+                            {% if ocr_product.get("serving_size") %}
+                                <span class="badge bg-info text-dark">{{ ocr_product.get("serving_size") }} g</span>
+                            {% else %}
+                                <span class="text-muted">— (Not detected)</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th>FSSAI Lic. No.</th>
+                        <td>
+                            {% if ocr_product.get("fssai") %}
+                                <span class="badge bg-secondary font-monospace">{{ ocr_product.get("fssai") }}</span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th>OCR Confidence</th>
+                        <td>
+                            {% set conf = ocr_product.get("ocr_confidence") or "medium" %}
+                            {% if conf == "high" %}
+                                <span class="badge bg-success">High Confidence</span>
+                            {% elif conf == "medium" %}
+                                <span class="badge bg-primary">Medium Confidence</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">Low Confidence</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th>Ingredients</th>
+                        <td style="font-size: 0.9rem;">
                             {{ ocr_product.get(
                                 "ingredients",
                                 "—"
@@ -159,74 +235,235 @@ V5 OCR & Recommendations - FoodGrade AI
 
                 </table>
 
+                {% if ocr_product.get("nutrition_warnings") %}
+                <div class="alert alert-light border small mt-2">
+                    <strong>Label Observation:</strong>
+                    <ul class="mb-0 ps-3">
+                        {% for warn in ocr_product.get("nutrition_warnings", []) %}
+                            <li>{{ warn }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
             </div>
 
 
             <div class="col-md-6">
 
-                <table class="table table-sm">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Nutrient</th>
+                                <th>Value (per 100g)</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set raw = ocr_product.get("raw_nutrition", {}) %}
 
-                    <tr>
-                        <th>Calories</th>
-                        <td>
-                            {{ ocr_product.get(
-                                "calories",
-                                0
-                            ) }}
-                        </td>
-                    </tr>
+                            <tr>
+                                <td>Calories / Energy</td>
+                                <td>
+                                    {% if raw.get("energy_kcal") is not none %}
+                                        <strong>{{ raw.get("energy_kcal") }}</strong> kcal
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if raw.get("energy_kcal") is not none %}
+                                        <span class="badge bg-success">Extracted</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Missing</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
 
-                    <tr>
-                        <th>Sugar</th>
-                        <td>
-                            {{ ocr_product.get(
-                                "sugar",
-                                0
-                            ) }} g
-                        </td>
-                    </tr>
+                            <tr>
+                                <td>Protein</td>
+                                <td>
+                                    {% if raw.get("protein_g") is not none %}
+                                        <strong>{{ raw.get("protein_g") }}</strong> g
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if raw.get("protein_g") is not none %}
+                                        <span class="badge bg-success">Extracted</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Missing</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
 
-                    <tr>
-                        <th>Fat</th>
-                        <td>
-                            {{ ocr_product.get(
-                                "total_fat",
-                                0
-                            ) }} g
-                        </td>
-                    </tr>
+                            <tr>
+                                <td>Total Carbohydrate</td>
+                                <td>
+                                    {% if raw.get("carbohydrates_g") is not none %}
+                                        <strong>{{ raw.get("carbohydrates_g") }}</strong> g
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if raw.get("carbohydrates_g") is not none %}
+                                        <span class="badge bg-success">Extracted</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Missing</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
 
-                    <tr>
-                        <th>Protein</th>
-                        <td>
-                            {{ ocr_product.get(
-                                "protein",
-                                0
-                            ) }} g
-                        </td>
-                    </tr>
+                            <tr>
+                                <td>Total Sugar</td>
+                                <td>
+                                    {% if raw.get("sugar_g") is not none %}
+                                        <strong>{{ raw.get("sugar_g") }}</strong> g
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if raw.get("sugar_g") is not none %}
+                                        <span class="badge bg-success">Extracted</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Missing</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
 
-                    <tr>
-                        <th>Fibre</th>
-                        <td>
-                            {{ ocr_product.get(
-                                "fibre",
-                                0
-                            ) }} g
-                        </td>
-                    </tr>
+                            <tr>
+                                <td>Total Fat</td>
+                                <td>
+                                    {% if raw.get("total_fat_g") is not none %}
+                                        <strong>{{ raw.get("total_fat_g") }}</strong> g
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if raw.get("total_fat_g") is not none %}
+                                        <span class="badge bg-success">Extracted</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Missing</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
 
-                    <tr>
-                        <th>Salt</th>
-                        <td>
-                            {{ ocr_product.get(
-                                "salt",
-                                0
-                            ) }} g
-                        </td>
-                    </tr>
+                            <tr>
+                                <td>Saturated Fat</td>
+                                <td>
+                                    {% if raw.get("saturated_fat_g") is not none %}
+                                        <strong>{{ raw.get("saturated_fat_g") }}</strong> g
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if raw.get("saturated_fat_g") is not none %}
+                                        <span class="badge bg-success">Extracted</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Missing</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
 
-                </table>
+                            <tr>
+                                <td>Trans Fat</td>
+                                <td>
+                                    {% if raw.get("trans_fat_g") is not none %}
+                                        <strong>{{ raw.get("trans_fat_g") }}</strong> g
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if raw.get("trans_fat_g") is not none %}
+                                        <span class="badge bg-success">Extracted</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Missing</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>Cholesterol</td>
+                                <td>
+                                    {% if raw.get("cholesterol_mg") is not none %}
+                                        <strong>{{ raw.get("cholesterol_mg") }}</strong> mg
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if raw.get("cholesterol_mg") is not none %}
+                                        <span class="badge bg-success">Extracted</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Missing</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>Sodium</td>
+                                <td>
+                                    {% if raw.get("sodium_mg") is not none %}
+                                        <strong>{{ raw.get("sodium_mg") }}</strong> mg
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if raw.get("sodium_mg") is not none %}
+                                        <span class="badge bg-success">Extracted</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Missing</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>Salt (Equiv.)</td>
+                                <td>
+                                    {% if raw.get("salt_g") is not none %}
+                                        <strong>{{ raw.get("salt_g") }}</strong> g
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if raw.get("salt_g") is not none %}
+                                        <span class="badge bg-success">Extracted</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Missing</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td>Dietary Fibre</td>
+                                <td>
+                                    {% if raw.get("dietary_fiber_g") is not none %}
+                                        <strong>{{ raw.get("dietary_fiber_g") }}</strong> g
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if raw.get("dietary_fiber_g") is not none %}
+                                        <span class="badge bg-success">Extracted</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Missing</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                </div>
 
             </div>
 
@@ -447,5 +684,6 @@ V5 OCR & Recommendations - FoodGrade AI
 
 {% endif %}
 
+</div>
 
 {% endblock %}

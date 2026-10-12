@@ -1,6 +1,130 @@
-{% extends "base.html" %}{% block title %}Analyze Product - FoodGrade AI{% endblock %}{% block content %}
-<div class="row justify-content-center"><div class="col-lg-9"><div class="mb-4"><h1 class="h3">Analyze a Food Product</h1><p class="text-muted">Manual entry remains available while the V2 dataset pipeline is being developed.</p></div>
-<form method="post" class="card shadow-sm"><div class="card-body p-4"><h2 class="h5 mb-3">Product information</h2><div class="row g-3">
-<div class="col-md-6"><label class="form-label">Product name *</label><input class="form-control" name="product_name" required></div><div class="col-md-6"><label class="form-label">Brand</label><input class="form-control" name="brand"></div><div class="col-md-6"><label class="form-label">Category</label><input class="form-control" name="category" placeholder="Biscuits, Cereal, Snacks..."></div><div class="col-12"><label class="form-label">Ingredients</label><textarea class="form-control" name="ingredients" rows="3"></textarea></div><div class="col-12"><label class="form-label">Packaging claims</label><input class="form-control" name="claims" placeholder="High Protein, High Fibre, No Added Sugar"></div></div><hr class="my-4"><h2 class="h5 mb-3">Nutrition per 100 g</h2><div class="row g-3">
-<div class="col-md-4"><label class="form-label">Calories (kcal)</label><input class="form-control" type="number" step="0.1" name="calories"></div><div class="col-md-4"><label class="form-label">Sugar (g)</label><input class="form-control" type="number" step="0.1" name="sugar"></div><div class="col-md-4"><label class="form-label">Total fat (g)</label><input class="form-control" type="number" step="0.1" name="total_fat"></div><div class="col-md-4"><label class="form-label">Saturated fat (g)</label><input class="form-control" type="number" step="0.1" name="saturated_fat"></div><div class="col-md-4"><label class="form-label">Protein (g)</label><input class="form-control" type="number" step="0.1" name="protein"></div><div class="col-md-4"><label class="form-label">Fibre (g)</label><input class="form-control" type="number" step="0.1" name="fibre"></div><div class="col-md-4"><label class="form-label">Salt (g)</label><input class="form-control" type="number" step="0.1" name="salt"></div></div><div class="alert alert-warning mt-4 mb-0"><strong>Prototype note:</strong> V2 still uses the temporary V1 grading rules. Final grading methodology is planned for V2.5.</div></div><div class="card-footer bg-white p-3"><button class="btn btn-dark">Analyze Product</button><a class="btn btn-outline-secondary" href="{{ url_for('index') }}">Cancel</a></div></form></div></div>
+{% extends "base.html" %}
+
+{% block title %}Add Product — FoodGrade AI{% endblock %}
+
+{% block page_class %}theme-products{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+
+            <!-- PAGE HEADER -->
+            <div class="fg-page-header">
+                <div>
+                    <div class="fg-theme-badge mb-2">
+                        <i class="bi bi-plus-circle-fill"></i> Manual Food Entry
+                    </div>
+                    <h1>Add & Analyze Product</h1>
+                    <p>Enter nutrition facts and packaging claims to calculate deterministic Health & Claim grades.</p>
+                </div>
+                <div>
+                    <a class="btn btn-outline-dark" href="{{ url_for('products') }}">
+                        <i class="bi bi-arrow-left me-1"></i> Catalog
+                    </a>
+                </div>
+            </div>
+
+            <!-- FORM CARD -->
+            <form method="post" class="card shadow-sm">
+                <div class="card-body p-4">
+
+                    <!-- Section: Product Identity -->
+                    <h2 class="h5 mb-3 fw-bold">
+                        <i class="bi bi-info-circle me-1 text-muted"></i> 1. Product Identity
+                    </h2>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Product Name <span class="text-danger">*</span></label>
+                            <input class="form-control" name="product_name" required placeholder="e.g. Classic Salted Potato Chips">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Brand</label>
+                            <input class="form-control" name="brand" placeholder="e.g. Lay's, Britannia, Kellogg's">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Category</label>
+                            <input class="form-control" name="category" placeholder="e.g. Snacks, Biscuits, Cereal, Beverages">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Packaging Claims</label>
+                            <input class="form-control" name="claims" placeholder="e.g. High Protein, High Fibre, No Added Sugar">
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Ingredients List</label>
+                            <textarea class="form-control" name="ingredients" rows="3" placeholder="Enter ingredients separated by commas: e.g. Potatoes, Edible Vegetable Oil, Iodised Salt..."></textarea>
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <!-- Section: Nutrition per 100g -->
+                    <h2 class="h5 mb-3 fw-bold">
+                        <i class="bi bi-pie-chart me-1 text-muted"></i> 2. Nutrition Profile (Per 100 g / ml)
+                    </h2>
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Energy / Calories (kcal)</label>
+                            <input class="form-control" type="number" step="0.1" name="calories" placeholder="e.g. 536">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Total Sugar (g)</label>
+                            <input class="form-control" type="number" step="0.1" name="sugar" placeholder="e.g. 0.6">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Total Fat (g)</label>
+                            <input class="form-control" type="number" step="0.1" name="total_fat" placeholder="e.g. 34.2">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Saturated Fat (g)</label>
+                            <input class="form-control" type="number" step="0.1" name="saturated_fat" placeholder="e.g. 15.2">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Protein (g)</label>
+                            <input class="form-control" type="number" step="0.1" name="protein" placeholder="e.g. 6.6">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Dietary Fibre (g)</label>
+                            <input class="form-control" type="number" step="0.1" name="fibre" placeholder="e.g. 2.5">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Salt (g)</label>
+                            <input class="form-control" type="number" step="0.1" name="salt" placeholder="e.g. 1.675">
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning mt-4 mb-0 d-flex align-items-center gap-2">
+                        <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+                        <div>
+                            <strong>Research Prototype Note:</strong> Missing fields receive a neutral reference baseline (50/100) per the FoodGrade V2.5 scoring methodology, rather than being assumed zero.
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="card-footer bg-white p-3 d-flex justify-content-between align-items-center">
+                    <a class="btn btn-outline-secondary" href="{{ url_for('products') }}">
+                        Cancel
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i> Analyze & Save Product
+                    </button>
+                </div>
+            </form>
+
+        </div>
+    </div>
+</div>
 {% endblock %}

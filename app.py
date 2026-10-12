@@ -24,7 +24,10 @@ from services.scrapy_runner import run_crawler
 
 from services.v5_ocr import (
     perform_ocr,
-    extract_product_from_text
+    extract_product_from_text,
+    is_valid_product_name,
+    OCRConnectionError,
+    OCRResponseError,
 )
 from services.v6_ml import (
     train_health_model,
@@ -567,20 +570,44 @@ def index():
 
     conn = get_db()
 
-    products = conn.execute(
+    # Select recent products with verified human-readable names
+    # Filter out empty names, nutrition keys, table noise, and generic fallbacks
+    all_rows = conn.execute(
         """
         SELECT *
         FROM products
+        WHERE product_name IS NOT NULL
+          AND product_name != ''
+          AND product_name != 'Food Product'
+          AND product_name != 'OCR Product'
+          AND product_name NOT LIKE '%_g:%'
+          AND product_name NOT LIKE '%_mg:%'
+          AND product_name NOT LIKE '%_kcal:%'
         ORDER BY id DESC
-        LIMIT 6
         """
     ).fetchall()
 
+    valid_products = [dict(r) for r in all_rows if is_valid_product_name(r["product_name"])][:6]
+
+    # Fetch a featured product for the Nutrition Snapshot card (preferring a cereal or well-documented product)
+    featured_product = None
+    featured_row = conn.execute(
+        """
+        SELECT *
+        FROM products
+        WHERE product_name IS NOT NULL
+          AND calories > 0
+          AND (sugar > 0 OR protein > 0)
+        ORDER BY CASE WHEN category = 'Cereal' THEN 0 ELSE 1 END, id ASC
+        LIMIT 1
+        """
+    ).fetchone()
+    if featured_row:
+        featured_product = dict(featured_row)
 
     total = conn.execute(
         "SELECT COUNT(*) FROM products"
     ).fetchone()[0]
-
 
     imported = conn.execute(
         """
@@ -590,13 +617,12 @@ def index():
         """
     ).fetchone()[0]
 
-
     conn.close()
-
 
     return render_template(
         "index.html",
-        products=products,
+        products=valid_products,
+        featured_product=featured_product,
         total=total,
         imported=imported
     )
@@ -614,50 +640,54 @@ def products():
         ""
     ).strip()
 
+    category_filter = request.args.get(
+        "category",
+        ""
+    ).strip()
+
+    view_mode = request.args.get(
+        "view",
+        "grid"
+    ).strip()
 
     conn = get_db()
 
+    # Get distinct non-empty categories for filter pills
+    cat_rows = conn.execute(
+        """
+        SELECT DISTINCT category
+        FROM products
+        WHERE category IS NOT NULL AND category != ''
+        ORDER BY category ASC
+        """
+    ).fetchall()
+    all_categories = [r["category"] for r in cat_rows]
+
+    sql = "SELECT * FROM products WHERE 1=1"
+    params = []
 
     if query:
+        sql += " AND (product_name LIKE ? OR brand LIKE ? OR category LIKE ?)"
+        pattern = f"%{query}%"
+        params.extend([pattern, pattern, pattern])
 
-        rows = conn.execute(
-            """
-            SELECT *
-            FROM products
+    if category_filter:
+        sql += " AND category = ?"
+        params.append(category_filter)
 
-            WHERE product_name LIKE ?
-               OR brand LIKE ?
-               OR category LIKE ?
+    sql += " ORDER BY id DESC"
 
-            ORDER BY id DESC
-            """,
-
-            (
-                f"%{query}%",
-                f"%{query}%",
-                f"%{query}%"
-            )
-        ).fetchall()
-
-
-    else:
-
-        rows = conn.execute(
-            """
-            SELECT *
-            FROM products
-            ORDER BY id DESC
-            """
-        ).fetchall()
-
+    rows = conn.execute(sql, params).fetchall()
 
     conn.close()
-
 
     return render_template(
         "products.html",
         products=rows,
-        query=query
+        query=query,
+        category_filter=category_filter,
+        view_mode=view_mode,
+        all_categories=all_categories
     )
 
 
@@ -1842,6 +1872,26 @@ def v5_ocr():
             product
         )
 
+        # --------------------------------------------------
+        # PRODUCT-NAME VALIDATION GUARD
+        # Block save if the extracted name is malformed, junk,
+        # or a placeholder — show the user a correction form.
+        # --------------------------------------------------
+        extracted_name = product.get("product_name", "")
+        if not is_valid_product_name(extracted_name):
+            flash(
+                "Product name could not be reliably extracted from the label. "
+                "Please review and correct the name below before saving.",
+                "warning"
+            )
+            return render_template(
+                "v5_ocr.html",
+                ocr_text=text,
+                ocr_product=product,
+                ocr_analysis=analysis,
+                recommendations=[],
+                name_needs_review=True,
+            )
 
         conn = get_db()
 
@@ -2033,6 +2083,24 @@ def v5_ocr():
             recommendations=recommendations
         )
 
+    except OCRConnectionError as conn_err:
+        flash(
+            f"Standalone OCR Service Unavailable: {conn_err}",
+            "warning"
+        )
+        return redirect(
+            url_for("v5_page")
+        )
+
+    except OCRResponseError as resp_err:
+        flash(
+            f"OCR Service Error: {resp_err}",
+            "danger"
+        )
+        return redirect(
+            url_for("v5_page")
+        )
+
     except Exception as exc:
 
         flash(
@@ -2043,6 +2111,69 @@ def v5_ocr():
         return redirect(
             url_for("v5_page")
         )
+
+# ============================================================
+# V5 — SAVE CORRECTED OCR PRODUCT NAME
+# ============================================================
+
+@app.route("/v5/ocr/save-corrected", endpoint="v5_ocr_save_corrected", methods=["POST"])
+def v5_ocr_save_corrected():
+    """Accept a user-corrected product name and save the OCR product to the DB."""
+    corrected_name = request.form.get("corrected_name", "").strip()
+    ocr_product_json = request.form.get("ocr_product_json", "{}")
+
+    if not corrected_name or not is_valid_product_name(corrected_name):
+        flash("Please enter a valid product name (at least 3 letters).", "warning")
+        return redirect(url_for("v5_page"))
+
+    try:
+        product = json.loads(ocr_product_json)
+    except (ValueError, TypeError):
+        flash("Could not parse OCR product data. Please re-upload the image.", "danger")
+        return redirect(url_for("v5_page"))
+
+    product["product_name"] = corrected_name
+    result = calculate_foodgrade(product)
+
+    conn = get_db()
+    conn.execute(
+        """
+        INSERT INTO products (
+            product_name, brand, category, ingredients, claims,
+            calories, sugar, total_fat, saturated_fat, protein, fibre, salt,
+            health_score, health_grade, claim_score, claim_grade,
+            source, source_url, image_url, data_quality_score
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            corrected_name,
+            product.get("brand", ""),
+            product.get("category", ""),
+            product.get("ingredients", ""),
+            product.get("claims", ""),
+            product.get("calories", 0),
+            product.get("sugar", 0),
+            product.get("total_fat", 0),
+            product.get("saturated_fat", 0),
+            product.get("protein", 0),
+            product.get("fibre", 0),
+            product.get("salt", 0),
+            result.get("health_score", 0),
+            result.get("health_grade", "E"),
+            result.get("claim_score", 0),
+            result.get("claim_grade", "E"),
+            "OCR",
+            "",
+            "",
+            result.get("data_quality_score", 0),
+        )
+    )
+    conn.commit()
+    conn.close()
+
+    flash(f"Product '{corrected_name}' saved successfully.", "success")
+    return redirect(url_for("products"))
+
 
 # ============================================================
 # V6 — MACHINE LEARNING

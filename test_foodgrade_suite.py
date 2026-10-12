@@ -46,6 +46,7 @@ from services.v6_ml import (
     FEATURES,
 )
 
+from services.openfoodfacts import _energy_kcal, _num, normalize_product
 
 class TestFoodGradeComprehensive(unittest.TestCase):
 
@@ -313,6 +314,224 @@ class TestFoodGradeComprehensive(unittest.TestCase):
                     f"Route {route} failed with status {res.status_code}"
                 )
 
+class TestOpenFoodFactsNormalization(unittest.TestCase):
+
+    def test_missing_and_zero_are_distinct(self):
+        self.assertIsNone(_num(None))
+        self.assertIsNone(_num(""))
+        self.assertEqual(_num(0), 0.0)
+
+    def test_invalid_and_non_finite_numbers_are_rejected(self):
+        self.assertIsNone(_num("invalid"))
+        self.assertIsNone(_num(float("nan")))
+        self.assertIsNone(_num(float("inf")))
+        self.assertIsNone(_num(-1))
+
+    def test_energy_uses_kcal_when_available(self):
+        self.assertEqual(
+            _energy_kcal({"energy-kcal_100g": 200}),
+            200.0,
+        )
+
+    def test_energy_converts_kj_when_kcal_is_missing(self):
+        self.assertEqual(
+            _energy_kcal({"energy-kj_100g": 418.4}),
+            100.0,
+        )
+
+    def test_conflicting_energy_values_are_rejected(self):
+        self.assertIsNone(
+            _energy_kcal({
+                "energy-kcal_100g": 3.4,
+                "energy-kj_100g": 454,
+            })
+        )
+
+    def test_prepared_energy_is_not_used_as_as_sold_energy(self):
+        self.assertIsNone(
+            _energy_kcal({"energy-kcal_prepared_100g": 384})
+        )
+
+    def test_normalization_preserves_missing_nutrients(self):
+        row = normalize_product({
+            "code": "test123",
+            "product_name": "Test Product",
+            "nutriments": {
+                "energy-kcal_100g": 0,
+                "sugars_100g": 0,
+            },
+        })
+
+        self.assertEqual(row["calories"], 0.0)
+        self.assertEqual(row["sugar"], 0.0)
+        self.assertIsNone(row["protein"])
+        self.assertIsNone(row["salt"])
+
+
+# ===========================================================================
+# PRODUCT NAME VALIDATION REGRESSION TESTS (Phase 1 Data Cleanup)
+# ===========================================================================
+
+from unittest.mock import patch
+from services.v5_ocr import is_valid_product_name
+
+
+class TestProductNameValidation(unittest.TestCase):
+    """Regression tests for is_valid_product_name() introduced in Phase 1."""
+
+    # --- Invalid names that MUST be rejected ---
+
+    def test_nutrition_key_rejected(self):
+        """Synthesized nutrition key 'carbohydrates_g: 53.6' must be rejected."""
+        self.assertFalse(is_valid_product_name("carbohydrates_g: 53.6"))
+
+    def test_nutrition_key_protein_rejected(self):
+        """Synthesized nutrition key 'protein_g: 6.6' must be rejected."""
+        self.assertFalse(is_valid_product_name("protein_g: 6.6"))
+
+    def test_nutrition_key_energy_rejected(self):
+        """Synthesized nutrition key 'energy_kcal: 536.0' must be rejected."""
+        self.assertFalse(is_valid_product_name("energy_kcal: 536.0"))
+
+    def test_junk_ocr_fragment_rejected(self):
+        """Watermark noise 'leo acts' must be rejected (known junk string)."""
+        self.assertFalse(is_valid_product_name("leo acts"))
+
+    def test_fallback_string_food_product_rejected(self):
+        """Default fallback 'Food Product' must be rejected."""
+        self.assertFalse(is_valid_product_name("Food Product"))
+
+    def test_fallback_string_ocr_product_rejected(self):
+        """Default fallback 'OCR Product' must be rejected."""
+        self.assertFalse(is_valid_product_name("OCR Product"))
+
+    def test_empty_string_rejected(self):
+        """Empty string must be rejected."""
+        self.assertFalse(is_valid_product_name(""))
+
+    def test_whitespace_only_rejected(self):
+        """Whitespace-only string must be rejected."""
+        self.assertFalse(is_valid_product_name("   "))
+
+    def test_table_separator_noise_rejected(self):
+        """Table separator noise '= Total [ 536 [ 107 | - J' must be rejected."""
+        self.assertFalse(is_valid_product_name("= Total [ 536 [ 107 | - J"))
+
+    def test_short_alpha_rejected(self):
+        """Strings with fewer than 3 alphabetic chars must be rejected."""
+        self.assertFalse(is_valid_product_name("AB"))
+
+    def test_symbol_noise_rejected(self):
+        """Strings composed mostly of symbols/punctuation must be rejected."""
+        self.assertFalse(is_valid_product_name("@#!$%^& foo"))
+
+    # --- Valid names that MUST be accepted ---
+
+    def test_valid_chips_name(self):
+        """'Classic Salted Potato Chips' is a valid product name."""
+        self.assertTrue(is_valid_product_name("Classic Salted Potato Chips"))
+
+    def test_valid_cereal_name(self):
+        """'Oats & Fibre Breakfast Cereal' is a valid product name."""
+        self.assertTrue(is_valid_product_name("Oats & Fibre Breakfast Cereal"))
+
+    def test_valid_biscuit_name(self):
+        """'Chocolate Cream Biscuits' is a valid product name."""
+        self.assertTrue(is_valid_product_name("Chocolate Cream Biscuits"))
+
+    def test_valid_short_brand_name(self):
+        """'Saffola Gold' is a valid product name."""
+        self.assertTrue(is_valid_product_name("Saffola Gold"))
+
+    def test_valid_numeric_in_name(self):
+        """Product names with numbers like 'Lay\\'s Classic 26g' are valid."""
+        self.assertTrue(is_valid_product_name("Lay's Classic 26g"))
+
+    # --- Integration: OCR upload with watermark image must NOT insert a DB record ---
+
+    @patch("app.perform_ocr", return_value="No nutrition or ingredient text detected on label.")
+    def test_ocr_upload_watermark_does_not_insert_malformed_record(self, mock_ocr):
+        """Uploading demo.webp must NOT insert a junk record into the DB (name blocked)."""
+        import io as _io
+        from app import app as flask_app, get_db as _get_db
+        client = flask_app.test_client()
+
+        # Count DB rows before the upload
+        conn = _get_db()
+        count_before = conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
+        conn.close()
+
+        with open("data/ocr/demo.webp", "rb") as f:
+            res = client.post(
+                "/v5/ocr",
+                data={"image": (_io.BytesIO(f.read()), "demo.webp")},
+                content_type="multipart/form-data",
+            )
+        self.assertEqual(res.status_code, 200)
+
+        # Count DB rows after — must be the same (no new record)
+        conn = _get_db()
+        count_after = conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
+        conn.close()
+        self.assertEqual(
+            count_before, count_after,
+            f"A junk DB record was inserted! Before={count_before}, After={count_after}"
+        )
+
+
+# ===========================================================================
+# PHASE 2: CATALOGUE, RESPONSIVE CARDS, SEARCH & FILTER REGRESSION TESTS
+# ===========================================================================
+
+
+class TestPhase2CatalogueAndGrid(unittest.TestCase):
+    """Regression tests for Phase 2 Indian packaged food catalogue improvements."""
+
+    def setUp(self):
+        self.app = app
+        self.app.config["TESTING"] = True
+        self.client = self.app.test_client()
+
+    def test_products_catalog_renders_card_grid(self):
+        """Verify the products page renders card grid with product cards."""
+        res = self.client.get("/products")
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+        self.assertIn("fg-catalog-card", html)
+        self.assertIn("View Analysis", html)
+
+    def test_products_catalog_renders_table_view(self):
+        """Verify table view mode renders cleanly when requested via query parameter."""
+        res = self.client.get("/products?view=table")
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+        self.assertIn("<table class=\"table", html)
+        self.assertIn("Barcode", html)
+
+    def test_category_filtering(self):
+        """Verify filtering by category isolates matching products."""
+        res = self.client.get("/products?category=Snacks")
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+        self.assertIn("Snacks", html)
+
+    def test_search_filtering(self):
+        """Verify search query isolates matching brands or names."""
+        res = self.client.get("/products?q=Kurkure")
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+        self.assertIn("Kurkure", html)
+
+    def test_dashboard_displays_valid_products_only(self):
+        """Verify dashboard recent products section displays genuine food names and image tags."""
+        res = self.client.get("/")
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+        self.assertNotIn("carbohydrates_g:", html)
+        self.assertNotIn("leo acts", html)
+        self.assertIn("fg-product", html)
+
 
 if __name__ == "__main__":
     unittest.main()
+

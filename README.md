@@ -29,9 +29,10 @@ These assessments remain unmerged: a product can have accurate claims without be
   - **Cookie Protection:** Server-side persistence of crawl outputs in `data/web/` preventing client-side cookie overflow.
 
 - **V5: OCR & Recommendation Engine:**
-  - Optical Character Recognition (OCR) using Pillow and Tesseract.
-  - Image preprocessing with camera EXIF rotation correction and contrast optimization.
-  - Structured extraction of nutrition tables, ingredients, and claims.
+  - **Standalone PaddleOCR/PaddleX Service Integration:** High-accuracy nutrition-label OCR via a separate FastAPI service (`nutrition-label-ocr-master`) running on port 8001. Extracts energy, protein, carbohydrates, sugars, fat, saturated fat, trans fat, cholesterol, sodium, serving size, ingredients, and FSSAI licence number per 100 g.
+  - Graceful Tesseract fallback when the standalone service is unavailable (with a clear actionable flash message directing the user to start it).
+  - Real zero values (e.g., cholesterol 0 mg) preserved and distinguished from missing values (stored as `None`, never silently coerced to zero).
+  - Image preprocessing with camera EXIF rotation correction and contrast optimisation.
   - Hybrid content-based recommendations: TF-IDF lexical profile + category matching + nutritional distance.
   - Healthier alternatives recommendation with transparent, granular reasons (e.g., `-8.5g sugar`, `+4.2g fibre`).
 
@@ -54,9 +55,10 @@ These assessments remain unmerged: a product can have accurate claims without be
 ### Requirements
 - Windows 10/11
 - Python 3.12 or 3.13
-- Tesseract OCR (installed at `C:\Program Files\Tesseract-OCR\tesseract.exe`)
+- Tesseract OCR (installed at `C:\Program Files\Tesseract-OCR\tesseract.exe`) — used as fallback when the standalone OCR service is unavailable
+- **Standalone OCR Service** (`nutrition-label-ocr-master\`) with its own separate Python virtual environment (PaddleOCR/PaddleX); see Section 3 for startup instructions
 
-### Virtual Environment Setup
+### FoodGrade AI Virtual Environment Setup
 Ensure the existing virtual environment `.venv` is activated:
 ```powershell
 # In PowerShell:
@@ -70,37 +72,108 @@ Ensure the existing virtual environment `.venv` is activated:
 
 ## 3. Launching the Application
 
-### Option A: PowerShell / Command Line
+FoodGrade AI uses **two separate processes**. The OCR service must be started first for full nutrition-label extraction accuracy. The Flask app runs independently and falls back to Tesseract if the OCR service is unavailable.
+
+### Step 1 — Start the Standalone OCR Service
+
+Open a **dedicated PowerShell terminal** in `nutrition-label-ocr-master\`:
+
 ```powershell
-& .venv\Scripts\python.exe app.py
+cd "..\nutrition-label-ocr-master"
+$env:PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK = "True"
+& ".\.venv\Scripts\python.exe" -m uvicorn main:app --host 127.0.0.1 --port 8001
 ```
-Open your browser and navigate to:
-```text
+
+Wait until you see: `Uvicorn running on http://127.0.0.1:8001`
+
+- Health check: `GET http://127.0.0.1:8001/health`
+- Swagger docs: `http://127.0.0.1:8001/docs`
+
+> **Keep this terminal open** while using the OCR feature in FoodGrade AI.
+
+### Step 2 — Start FoodGrade AI (Flask)
+
+Open a **second PowerShell terminal** in `FoodGrade_AI_Main\`:
+
+```powershell
+& ".\.venv\Scripts\python.exe" app.py
+```
+
+Then open your browser and navigate to:
+```
 http://127.0.0.1:5000
 ```
 
-### Option B: Batch Scripts
-Double-click `start.bat` from Windows Explorer.
+### Configuration
 
----
+| Variable | Default | Description |
+|---|---|---|
+| `FOODGRADE_OCR_URL` | `http://127.0.0.1:8001` | Base URL of the standalone OCR service |
 
-## 4. Running the Automated Test Suite
-
-All tests can be executed using `pytest` inside the virtual environment:
-
+To use a custom OCR service URL:
 ```powershell
-# Run the master comprehensive test suite:
-& .venv\Scripts\python.exe -m pytest test_foodgrade_suite.py -v
-
-# Run all test suites including baseline tests:
-& .venv\Scripts\python.exe -m pytest tests_phase1.py test_foodgrade_suite.py -v
+$env:FOODGRADE_OCR_URL = "http://192.168.1.100:8001"
+& ".\.venv\Scripts\python.exe" app.py
 ```
 
-All 27 automated tests and 28 subtests run in isolation without modifying the primary database.
+### Option: Batch Script
+Double-click `start.bat` from Windows Explorer (starts Flask only; start the OCR service separately).
 
 ---
 
-## 5. Scoring & Claim Verification Methodology
+## 4. Troubleshooting
+
+### OCR Service Not Available
+If you upload an image and see **"Standalone OCR Service Unavailable"**:
+1. Open a new PowerShell terminal in `nutrition-label-ocr-master\`.
+2. Run: `$env:PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK = "True"` then `& ".\.venv\Scripts\python.exe" -m uvicorn main:app --host 127.0.0.1 --port 8001`
+3. Wait for `Application startup complete.`
+4. Retry the image upload.
+
+FoodGrade AI will automatically fall back to Tesseract OCR while the service is down. Tesseract produces less accurate extraction for complex nutrition tables.
+
+### Port 8001 Already in Use
+```powershell
+# Find and kill the process using port 8001:
+netstat -ano | findstr :8001
+taskkill /PID <pid> /F
+```
+
+
+
+## 5. Running the Automated Test Suite
+
+All tests are run via `unittest` inside the FoodGrade AI virtual environment:
+
+```powershell
+# Comprehensive suite (24 tests):
+& ".\.venv\Scripts\python.exe" -m unittest test_foodgrade_suite.py -v
+
+# Core intelligence + phase 1 tests (10 tests):
+& ".\.venv\Scripts\python.exe" -m unittest tests_phase1.py -v
+
+# OCR integration suite (13 mocked tests — no live OCR service required):
+& ".\.venv\Scripts\python.exe" -m unittest test_ocr_integration.py -v
+
+# Phase 2 ML + recommender tests (script-mode):
+& ".\.venv\Scripts\python.exe" tests_phase2.py
+
+# Run suites together:
+& ".\.venv\Scripts\python.exe" -m unittest test_foodgrade_suite.py tests_phase1.py test_ocr_integration.py -v
+```
+
+| Test File | Tests | Scope |
+|---|---:|---|
+| `test_foodgrade_suite.py` | 24 | Grading engine, SSRF, OFF normalisation, ML, routes |
+| `tests_phase1.py` | 10 | Claim states, 6-dimension weights, NLP pipeline |
+| `test_ocr_integration.py` | 13 | OCR service integration, normalisation, error handling |
+| `tests_phase2.py` | 7 | ML training, caching, prediction, recommender |
+| **Total** | **54** | All run without modifying the primary database |
+
+---
+
+
+## 6. Scoring & Claim Verification Methodology
 
 ### Health Score Weights (0–100)
 | Dimension | Weight | Target Direction | FSSAI Reference Standard |
@@ -130,8 +203,9 @@ Missing or undeclared nutritional fields are **not silently converted to zero**.
 
 ---
 
-## 6. Research Disclaimers & Known Limitations
+## 7. Research Disclaimers & Known Limitations
 
 1. **Academic Research Prototype:** FoodGrade AI is developed for academic demonstration and research. It does not constitute clinical, dietary, or medical advice.
 2. **Surrogate ML Model:** The Random Forest model in V6 serves as an algorithmic surrogate trained to approximate the deterministic 6-dimension rules; it is not independently trained on human health outcomes.
 3. **Data Completeness:** Product evaluations rely on declared package labels and Open Food Facts crowd-sourced entries, which may contain omissions or reporting variations.
+4. **OCR Accuracy:** Nutrition values extracted via OCR are estimates. Verify critical values against the physical product label.

@@ -120,8 +120,11 @@ def _load_db_products() -> pd.DataFrame:
         return pd.DataFrame(columns=FEATURES + ["health_grade"])
 
     df = pd.DataFrame(rows)
+
     for col in FEATURES:
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    df = df.dropna(subset=FEATURES)
     return df[FEATURES + ["health_grade"]]
 
 
@@ -151,14 +154,17 @@ def _load_csv_products() -> pd.DataFrame:
         except Exception:
             return pd.DataFrame(columns=FEATURES + ["health_grade"])
 
-    # Keep only labelled rows with valid grades
+    # Keep only labelled rows with valid grades.
     df = df[df["health_grade"].isin(["A", "B", "C", "D", "E"])].copy()
 
+    # Convert feature values to numeric without replacing missing values with zero.
     for col in FEATURES:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
-        else:
-            df[col] = 0.0
+        if col not in df.columns:
+            df[col] = np.nan
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    # Exclude rows with missing or invalid nutrition features.
+    df = df.dropna(subset=FEATURES)
 
     return df[FEATURES + ["health_grade"]]
 
@@ -397,16 +403,33 @@ def predict_health_grade(
 
     values = []
     for feature in FEATURES:
-        try:
-            value = float(product.get(feature, 0) or 0)
-        except (ValueError, TypeError):
-            value = 0.0
-        # Basic sanity bounds
-        if feature == "calories":
-            value = max(0.0, min(value, 1200.0))
-        else:
-            value = max(0.0, min(value, 100.0))
-        values.append(value)
+
+        values = []
+
+        for feature in FEATURES:
+            raw_value = product.get(feature)
+
+            if raw_value is None or raw_value == "":
+                return {
+                    "success": False,
+                    "error": f"Missing nutrition value: {feature}",
+                }
+
+            try:
+                value = float(raw_value)
+            except (ValueError, TypeError):
+                return {
+                    "success": False,
+                    "error": f"Invalid nutrition value: {feature}",
+                }
+
+            if not np.isfinite(value) or value < 0:
+                return {
+                    "success": False,
+                    "error": f"Invalid nutrition value: {feature}",
+                }
+
+            values.append(value)
 
     dataframe = pd.DataFrame([values], columns=FEATURES)
     grade = str(model.predict(dataframe)[0])

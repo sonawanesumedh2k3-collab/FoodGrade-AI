@@ -41,15 +41,59 @@ CSV_COLUMNS = [
     "source", "source_url", "image_url", "data_quality_score", "imported_at"
 ]
 
+def _energy_kcal(nutriments: dict[str, Any]) -> float | None:
+    """Read as-sold energy in kcal/100g, converting kJ when necessary."""
+    kcal = _num(nutriments.get("energy-kcal_100g"))
+    kj = _num(nutriments.get("energy-kj_100g"))
 
-def _num(value: Any) -> float:
+    if kcal is not None and kj is not None:
+        expected_kcal = kj / 4.184
+        if abs(kcal - expected_kcal) > max(10.0, expected_kcal * 0.10):
+            return None
+        return kcal
+
+    if kcal is not None:
+        return kcal
+
+    if kj is not None:
+        return round(kj / 4.184, 3)
+
+    return None
+
+def _num(value: Any) -> float | None:
+    """Return None for missing or invalid values; preserve genuine zero."""
+    if value is None or value == "":
+        return None
+
     try:
-        if value is None or value == "":
-            return 0.0
-        return round(float(value), 3)
+        number = float(value)
     except (TypeError, ValueError):
-        return 0.0
+        return None
 
+    if not (number >= 0 and number < float("inf")):
+        return None
+
+    return round(number, 3)
+
+def _energy_kcal(nutriments: dict[str, Any]) -> float | None:
+    """Read as-sold energy in kcal/100g, converting kJ when necessary."""
+    kcal = _num(nutriments.get("energy-kcal_100g"))
+    kj = _num(nutriments.get("energy-kj_100g"))
+
+    # Prefer kcal only when both available energy declarations are consistent.
+    if kcal is not None and kj is not None:
+        expected_kcal = kj / 4.184
+        if abs(kcal - expected_kcal) > max(10.0, expected_kcal * 0.10):
+            return None
+        return kcal
+
+    if kcal is not None:
+        return kcal
+
+    if kj is not None:
+        return round(kj / 4.184, 3)
+
+    return None
 
 def _tags_to_text(value: Any) -> str:
     if isinstance(value, list):
@@ -79,7 +123,7 @@ def normalize_product(product: dict[str, Any]) -> dict[str, Any]:
         "category": str(product.get("categories") or "").split(",")[0].strip(),
         "ingredients": ingredients,
         "claims": claims,
-        "calories": _num(nutriments.get("energy-kcal_100g")),
+        "calories": _energy_kcal(nutriments),
         "sugar": _num(nutriments.get("sugars_100g")),
         "total_fat": _num(nutriments.get("fat_100g")),
         "saturated_fat": _num(nutriments.get("saturated-fat_100g")),
@@ -94,13 +138,20 @@ def normalize_product(product: dict[str, Any]) -> dict[str, Any]:
     }
 
     checks = [
-        bool(row["product_name"]), bool(row["ingredients"]), bool(row["brand"]),
-        bool(row["category"]), row["calories"] > 0, row["sugar"] > 0 or row["protein"] > 0,
+        bool(row["product_name"]),
+        bool(row["ingredients"]),
+        bool(row["brand"]),
+        bool(row["category"]),
+        row["calories"] is not None and row["calories"] > 0,
+        (
+                (row["sugar"] is not None and row["sugar"] > 0)
+                or (row["protein"] is not None and row["protein"] > 0)
+        ),
         bool(row["barcode"]),
     ]
+    
     row["data_quality_score"] = round(sum(checks) / len(checks) * 100, 1)
     return row
-
 
 def fetch_indian_products(limit: int = 25, timeout: int = 30) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Fetch a small, structured sample of products associated with India.

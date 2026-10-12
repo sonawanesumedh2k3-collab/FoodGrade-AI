@@ -2,18 +2,24 @@
 
 {% block title %}V6 — Machine Learning · FoodGrade AI{% endblock %}
 
+{% block page_class %}theme-model{% endblock %}
+
 {% block content %}
 
 <div class="container py-4">
 
-  <div class="d-flex justify-content-between align-items-center mb-3">
+  <!-- PAGE HEADER -->
+  <div class="fg-page-header">
     <div>
-      <h2 class="mb-0">V6 — Machine Learning</h2>
-      <p class="text-muted mb-0">Random Forest health-grade prediction · nutritional features.</p>
+      <div class="fg-theme-badge mb-2">
+        <i class="bi bi-cpu-fill"></i> Machine Learning Surrogate
+      </div>
+      <h1>AI Model & Predictive Health Grading</h1>
+      <p>Supervised Random Forest classifier approximating deterministic 6-dimension health grades.</p>
     </div>
     <form method="post" action="{{ url_for('v6_train') }}">
       <button type="submit" class="btn btn-primary">
-        🔁 Train / Retrain Model
+        <i class="bi bi-arrow-repeat me-1"></i> Train / Retrain Model
       </button>
     </form>
   </div>
